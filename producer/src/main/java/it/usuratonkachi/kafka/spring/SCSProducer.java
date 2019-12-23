@@ -28,8 +28,10 @@ public class SCSProducer implements CommandLineRunner {
 	@Value("${spring.profiles:default}")
 	private String profile;
 
-	private final Integer count;
-	private final Long waittime;
+	@Value("${default.count:10}")
+	private final Integer count = 10;
+	@Value("${default.waittime:1000L}")
+	private final Long waittime = 1000L;
 
 	private final KafkaService kafkaService;
 

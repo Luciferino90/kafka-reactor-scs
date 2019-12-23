@@ -9,6 +9,7 @@ import it.usuratonkachi.kafka.spring.streamconfig.Streams;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Processor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.messaging.handler.annotation.Headers;
@@ -28,7 +29,8 @@ public class SCSConsumer {
 
 	private final KafkaService kafkaService;
 
-	private long waittime = 10000L;
+	@Value("${default.waittime:10000L}")
+	private final Long waittime = 10000L;
 
 	private void waitSleep(){
 		try {

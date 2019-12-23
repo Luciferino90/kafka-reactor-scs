@@ -21,6 +21,9 @@ public class ReactorConsumer {
 	@Value("${spring.profiles:default}")
 	private String profile;
 
+	@Value("${default.waittime:10000L}")
+	private final Long waittime = 10000L;
+
 	private static Boolean started = false;
 
 	private final ReactiveStreamDispatcher<Mail> mailDispatcher;
@@ -34,12 +37,11 @@ public class ReactorConsumer {
 	public void onMessages() {
 		if (started) return;
 		else started = true;
-		long waitTime = 0L;
 		mailDispatcher.listen()
 				.doOnNext(r -> {
 					kafkaService.ackIfNotYetLogOtherwise(r.getPayload().getMsgNum(), r.getPayload().getProducer(), r.getPayload().getClass().getSimpleName());
 					try {
-						Thread.sleep(waitTime);
+						Thread.sleep(waittime);
 					} catch (InterruptedException ex) {
 						ex.printStackTrace();
 					}
@@ -50,7 +52,7 @@ public class ReactorConsumer {
 				.doOnNext(r -> {
 					kafkaService.ackIfNotYetLogOtherwise(r.getPayload().getMsgNum(), r.getPayload().getProducer(), r.getPayload().getClass().getSimpleName());
 					try {
-						Thread.sleep(waitTime);
+						Thread.sleep(waittime);
 					} catch (InterruptedException ex) {
 						ex.printStackTrace();
 					}
@@ -60,7 +62,7 @@ public class ReactorConsumer {
 				.doOnNext(r -> {
 					kafkaService.ackIfNotYetLogOtherwise(r.getPayload().getMsgNum(), r.getPayload().getProducer(), r.getPayload().getClass().getSimpleName());
 					try {
-						Thread.sleep(waitTime);
+						Thread.sleep(waittime);
 					} catch (InterruptedException ex) {
 						ex.printStackTrace();
 					}
@@ -70,7 +72,7 @@ public class ReactorConsumer {
 				.doOnNext(r -> {
 					kafkaService.ackIfNotYetLogOtherwise(r.getPayload().getMsgNum(), r.getPayload().getProducer(), r.getPayload().getClass().getSimpleName());
 					try {
-						Thread.sleep(waitTime);
+						Thread.sleep(waittime);
 					} catch (InterruptedException ex) {
 						ex.printStackTrace();
 					}

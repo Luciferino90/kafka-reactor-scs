@@ -81,6 +81,10 @@ server:
     mime-types: text/html,text/css,application/json
     min-response-size: 2048
 
+defaut:
+  waittime: 1000L
+  count: 10
+
 logging:
   level:
     root: INFO

@@ -7,8 +7,6 @@ import it.usuratonkachi.kafka.dto.Mms;
 import it.usuratonkachi.kafka.dto.Sms;
 import it.usuratonkachi.kafka.reactor.config.ReactiveStreamDispatcher;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.messaging.support.MessageBuilder;
@@ -16,7 +14,6 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.kafka.sender.SenderResult;
 
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
@@ -30,8 +27,10 @@ public class ReactorProducer implements CommandLineRunner {
 	@Value("${spring.profiles}")
 	private String profile;
 
-	private static final Logger log = LoggerFactory.getLogger(ReactorProducer.class.getName());
-	SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss:SSS z dd MMM yyyy");
+	@Value("${default.count:10}")
+	private final Integer count = 10;
+	@Value("${default.waittime:1000L}")
+	private final Long waittime = 1000L;
 
 	private final ReactiveStreamDispatcher<Mail> mailDispatcher;
 	private final ReactiveStreamDispatcher<Message> messageDispatcher;
