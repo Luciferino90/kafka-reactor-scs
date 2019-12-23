@@ -29,7 +29,7 @@ public class SCSConsumer {
 
 	private final KafkaService kafkaService;
 
-	@Value("${default.waittime:10000}")
+	@Value("${default.waittime:1000}")
 	private Long waittime;
 
 	private void waitSleep(){

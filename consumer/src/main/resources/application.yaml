@@ -46,8 +46,32 @@ spring:
             processing.guarantee: exactly-once
         bindings:
           mail-kafka-in:
+            auto-commit-offset: true
+            ack-each-record: true
             consumer:
               configuration:
+                max.poll.records: 1
+                max.poll.interval.ms: 120000
+          message-kafka-in:
+            auto-commit-offset: true
+            ack-each-record: true
+            consumer:
+              configuration:
+                max.poll.records: 1
+                max.poll.interval.ms: 120000
+          mms-kafka-in:
+            auto-commit-offset: true
+            ack-each-record: true
+            consumer:
+              configuration:
+                max.poll.records: 1
+                max.poll.interval.ms: 120000
+          sms-kafka-in:
+            auto-commit-offset: true
+            ack-each-record: true
+            consumer:
+              configuration:
+                max.poll.records: 1
                 max.poll.interval.ms: 120000
       bindings:
         mail-kafka-in: # consumer
@@ -64,7 +88,6 @@ spring:
           destination: message-kafka-topic
           contentType: application/json
           consumer:
-            auto-commit-offset: true
             concurrency: 1
             max-attempts: 3
             partitioned: true
@@ -73,7 +96,6 @@ spring:
           destination: mms-kafka-topic
           contentType: application/json
           consumer:
-            auto-commit-offset: true
             concurrency: 1
             max-attempts: 3
             partitioned: true
@@ -82,7 +104,6 @@ spring:
           destination: sms-kafka-topic
           contentType: application/json
           consumer:
-            auto-commit-offset: true
             concurrency: 1
             max-attempts: 3
             partitioned: true
@@ -95,7 +116,7 @@ server:
     min-response-size: 2048
 
 defaut:
-  waittime: 10000L
+  waittime: 1000L
   count: 10
 
 logging:
