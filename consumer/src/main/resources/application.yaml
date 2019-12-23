@@ -44,6 +44,11 @@ spring:
           auto-add-partitions: true
           configuration:
             processing.guarantee: exactly-once
+        bindings:
+          mail-kafka-in:
+            consumer:
+              configuration:
+                max.poll.interval.ms: 120000
       bindings:
         mail-kafka-in: # consumer
           group: ${spring.application.name}
@@ -85,17 +90,6 @@ spring:
             max-attempts: 3
             partitioned: true
             partition-count: 10
-        spring-kafka-in: # consumer
-          group: ${spring.application.name}
-          destination: spring-kafka-topic
-          contentType: application/json
-          consumer:
-            auto-commit-offset: false
-            concurrency: 1
-            max-attempts: 3
-            partitioned: true
-            partition-count: 10
-            auto-add-partitions: true
 
 server:
   port: 0

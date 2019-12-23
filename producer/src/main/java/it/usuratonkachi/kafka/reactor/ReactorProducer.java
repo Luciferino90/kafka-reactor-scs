@@ -2,6 +2,9 @@ package it.usuratonkachi.kafka.reactor;
 
 import it.usuratonkachi.kafka.data.service.KafkaService;
 import it.usuratonkachi.kafka.dto.Mail;
+import it.usuratonkachi.kafka.dto.Message;
+import it.usuratonkachi.kafka.dto.Mms;
+import it.usuratonkachi.kafka.dto.Sms;
 import it.usuratonkachi.kafka.reactor.config.ReactiveStreamDispatcher;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -31,9 +34,9 @@ public class ReactorProducer implements CommandLineRunner {
 	SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss:SSS z dd MMM yyyy");
 
 	private final ReactiveStreamDispatcher<Mail> mailDispatcher;
-	//private final ReactiveStreamDispatcher<Message> messageDispatcher;
-	//private final ReactiveStreamDispatcher<Mms> mmsDispatcher;
-	//private final ReactiveStreamDispatcher<Sms> smsDispatcher;
+	private final ReactiveStreamDispatcher<Message> messageDispatcher;
+	private final ReactiveStreamDispatcher<Mms> mmsDispatcher;
+	private final ReactiveStreamDispatcher<Sms> smsDispatcher;
 
 	private final KafkaService kafkaService;
 
@@ -64,7 +67,7 @@ public class ReactorProducer implements CommandLineRunner {
 				.flatMap(mailDispatcher::send);
 	}
 
-	/*private Flux<SenderResult<Object>> sendMessage(Integer count, Integer baseCount){
+	private Flux<SenderResult<Object>> sendMessage(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -119,7 +122,7 @@ public class ReactorProducer implements CommandLineRunner {
 				)
 				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
 				.flatMap(smsDispatcher::send);
-	}*/
+	}
 
 	public void runLimited(Integer count) {
 		String msg = profile;

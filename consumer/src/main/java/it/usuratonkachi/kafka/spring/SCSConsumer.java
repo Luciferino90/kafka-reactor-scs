@@ -30,7 +30,7 @@ public class SCSConsumer {
 
 	@StreamListener(Streams.MAIL_CHANNEL_INPUT)
 	public void onMail(@Payload Mail msg, @Headers Map<String, Object> headers) {
-		long waittime = 0L;
+		long waittime = 10000L;
 		final Mono<Mail> mono = Mono.just(msg)
 				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
 				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
@@ -38,7 +38,7 @@ public class SCSConsumer {
 		mono.block();
 	}
 
-	//@StreamListener(Streams.MESSAGE_CHANNEL_INPUT)
+	@StreamListener(Streams.MESSAGE_CHANNEL_INPUT)
 	public void onMessage(@Payload Message msg, @Headers Map<String, Object> headers) {
 		long waittime = 0L;
 		final Mono<Message> mono = Mono.just(msg)
@@ -48,7 +48,7 @@ public class SCSConsumer {
 		mono.block();
 	}
 
-	//@StreamListener(Streams.MMS_CHANNEL_INPUT)
+	@StreamListener(Streams.MMS_CHANNEL_INPUT)
 	public void onMms(@Payload Mms msg, @Headers Map<String, Object> headers) {
 		long waittime = 0L;
 		final Mono<Mms> mono = Mono.just(msg)
@@ -58,7 +58,7 @@ public class SCSConsumer {
 		mono.block();
 	}
 
-	//@StreamListener(Streams.SMS_CHANNEL_INPUT)
+	@StreamListener(Streams.SMS_CHANNEL_INPUT)
 	public void onSms(@Payload Sms msg, @Headers Map<String, Object> headers) {
 		long waittime = 0L;
 		final Mono<Sms> mono = Mono.just(msg)
