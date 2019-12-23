@@ -20,9 +20,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
-/**
- * @author luciano.boschi
- */
 @RequiredArgsConstructor
 @Component
 @Slf4j
@@ -30,6 +27,9 @@ public class SCSProducer implements CommandLineRunner {
 
 	@Value("${spring.profiles:default}")
 	private String profile;
+
+	private final Integer count;
+	private final Long waittime;
 
 	private final KafkaService kafkaService;
 
@@ -50,11 +50,11 @@ public class SCSProducer implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) {
-		//runLimited(1000);
-		runForever(10, 1000L);
+		//runLimited();
+		runForever();
 	}
 
-	public void runLimited(Integer count) {
+	public void runLimited() {
 		String msg = profile;
 		sendMail(count, 0).subscribe();
 		//sendMessage(count, 0).subscribe();
@@ -62,9 +62,9 @@ public class SCSProducer implements CommandLineRunner {
 		//sendSms(count, 0).collectList().block();
 	}
 
-	public void runForever(Integer count, Long waitTime) {
+	public void runForever() {
 		String msg = profile;
-		Flux.interval(Duration.ofMillis(waitTime))
+		Flux.interval(Duration.ofMillis(waittime))
 				.doOnNext(i -> {
 					int basecount = base.getAndIncrement();
 					sendMail(count, basecount).subscribe();

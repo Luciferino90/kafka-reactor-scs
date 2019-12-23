@@ -28,11 +28,21 @@ public class SCSConsumer {
 
 	private final KafkaService kafkaService;
 
+	private long waittime = 10000L;
+
+	private void waitSleep(){
+		try {
+			Thread.sleep(waittime);
+		} catch (InterruptedException ex) {
+			ex.printStackTrace();
+		}
+	}
+
 	@StreamListener(Streams.MAIL_CHANNEL_INPUT)
 	public void onMail(@Payload Mail msg, @Headers Map<String, Object> headers) {
-		long waittime = 10000L;
 		final Mono<Mail> mono = Mono.just(msg)
 				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
+				.doOnNext(e -> waitSleep())
 				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
 		mono.block();
@@ -40,9 +50,9 @@ public class SCSConsumer {
 
 	@StreamListener(Streams.MESSAGE_CHANNEL_INPUT)
 	public void onMessage(@Payload Message msg, @Headers Map<String, Object> headers) {
-		long waittime = 0L;
 		final Mono<Message> mono = Mono.just(msg)
 				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
+				.doOnNext(e -> waitSleep())
 				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
 		mono.block();
@@ -50,9 +60,9 @@ public class SCSConsumer {
 
 	@StreamListener(Streams.MMS_CHANNEL_INPUT)
 	public void onMms(@Payload Mms msg, @Headers Map<String, Object> headers) {
-		long waittime = 0L;
 		final Mono<Mms> mono = Mono.just(msg)
 				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
+				.doOnNext(e -> waitSleep())
 				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
 		mono.block();
@@ -60,9 +70,9 @@ public class SCSConsumer {
 
 	@StreamListener(Streams.SMS_CHANNEL_INPUT)
 	public void onSms(@Payload Sms msg, @Headers Map<String, Object> headers) {
-		long waittime = 0L;
 		final Mono<Sms> mono = Mono.just(msg)
 				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
+				.doOnNext(e -> waitSleep())
 				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
 		mono.block();

@@ -101,7 +101,7 @@ server:
 logging:
   level:
     root: INFO
-    org: ERROR
+    #org: ERROR
 ---
 spring:
   profiles: 1
