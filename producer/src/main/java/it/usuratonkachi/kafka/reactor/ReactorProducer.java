@@ -28,7 +28,7 @@ public class ReactorProducer implements CommandLineRunner {
 	private String profile;
 
 	@Value("${default.count:10}")
-	private final Integer count;
+	private Integer count;
 	@Value("${default.waittime:10000}")
 	private Long waittime;
 
