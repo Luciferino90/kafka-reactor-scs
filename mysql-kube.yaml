@@ -1,0 +1,64 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: mysql
+  namespace: default
+  labels:
+    k8s-app: mysql
+spec:
+  ports:
+    - name: tcp-3306-3306-jf5ll
+      protocol: TCP
+      port: 3306
+      targetPort: 3306
+        nodePort: 30406
+  selector:
+    k8s-app: mysql
+  type: LoadBalancer
+  sessionAffinity: None
+  externalTrafficPolicy: Cluster
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: mysql
+  namespace: default
+  labels:
+    k8s-app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: mysql
+  template:
+    metadata:
+      name: mysql
+      creationTimestamp: null
+      labels:
+        k8s-app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: 'mysql:5.7'
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: root
+            - name: MYSQL_USER
+              value: kafkacheck
+            - name: MYSQL_PASSWORD
+              value: kafkacheck
+            - name: MYSQL_DATABASE
+              value: kafkacheck
+          resources: {}
+          volumeMounts:
+            - name: mysql
+              mountPath: /var/lib/mysql
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+          securityContext:
+            privileged: false
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}

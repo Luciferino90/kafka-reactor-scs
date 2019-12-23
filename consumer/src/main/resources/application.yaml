@@ -1,0 +1,125 @@
+spring:
+  main:
+    banner-mode: console
+    log-startup-info: false
+  application:
+    name: rnd-spring-kafka-listener
+
+
+  datasource:
+    url: "jdbc:mysql://localhost:3306/kafkacheck?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC&tinyInt1isBit=false&useSSL=false"
+    driver-class-name: com.mysql.jdbc.Driver
+    username: kafkacheck
+    password: kafkacheck
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL57Dialect
+  http:
+    encoding:
+      enabled: true
+      charset: UTF-8
+      force: true
+
+  webflux:
+    date-format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"
+
+  jackson:
+    date-format: "yyyy-MM-dd'T'HH:mm:ss.SSSX"
+    joda-date-time-format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+    serialization:
+      write-dates-as-timestamps: false
+      WRITE_DATES_AS_TIMESTAMPS: false
+      indent-output: true
+    locale: it_IT
+    time-zone: GMT+1
+
+  cloud:
+    stream:
+      kafka:
+        binder:
+          brokers: localhost:9092
+          auto-add-partitions: true
+          configuration:
+            processing.guarantee: exactly-once
+      bindings:
+        mail-kafka-in: # consumer
+          group: ${spring.application.name}
+          destination: mail-kafka-topic
+          contentType: application/json
+          consumer:
+            auto-commit-offset: false
+            concurrency: 1
+            max-attempts: 3
+            partitioned: true
+            partition-count: 10
+        message-kafka-in: # consumer
+          group: ${spring.application.name}
+          destination: message-kafka-topic
+          contentType: application/json
+          consumer:
+            auto-commit-offset: false
+            concurrency: 1
+            max-attempts: 3
+            partitioned: true
+            partition-count: 10
+        mms-kafka-in: # consumer
+          group: ${spring.application.name}
+          destination: mms-kafka-topic
+          contentType: application/json
+          consumer:
+            auto-commit-offset: false
+            concurrency: 1
+            max-attempts: 3
+            partitioned: true
+            partition-count: 10
+        sms-kafka-in: # consumer
+          group: ${spring.application.name}
+          destination: sms-kafka-topic
+          contentType: application/json
+          consumer:
+            auto-commit-offset: false
+            concurrency: 1
+            max-attempts: 3
+            partitioned: true
+            partition-count: 10
+        spring-kafka-in: # consumer
+          group: ${spring.application.name}
+          destination: spring-kafka-topic
+          contentType: application/json
+          consumer:
+            auto-commit-offset: false
+            concurrency: 1
+            max-attempts: 3
+            partitioned: true
+            partition-count: 10
+            auto-add-partitions: true
+
+server:
+  port: 0
+  compression:
+    enabled: true
+    mime-types: text/html,text/css,application/json
+    min-response-size: 2048
+
+logging:
+  level:
+    root: INFO
+    org: ERROR
+---
+spring:
+  profiles: 1
+---
+spring:
+  profiles: 2
+---
+spring:
+  profiles: 3
+---
+spring:
+  profiles: 4
+---
+spring:
+  profiles: 5
