@@ -82,7 +82,7 @@ server:
     min-response-size: 2048
 
 defaut:
-  waittime: 1000L
+  waittime: 1000
   count: 10
 
 logging:

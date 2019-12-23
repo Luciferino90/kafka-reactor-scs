@@ -15,11 +15,11 @@ public interface Streams {
 
 	@Input(MAIL_CHANNEL_INPUT)
 	SubscribableChannel inboundMailKafka();
-	//@Input(MESSAGE_CHANNEL_INPUT)
+	@Input(MESSAGE_CHANNEL_INPUT)
 	SubscribableChannel inboundMeesageKafka();
-	//@Input(MMS_CHANNEL_INPUT)
+	@Input(MMS_CHANNEL_INPUT)
 	SubscribableChannel inboundMmsKafka();
-	//@Input(SMS_CHANNEL_INPUT)
+	@Input(SMS_CHANNEL_INPUT)
 	SubscribableChannel inboundSmsKafka();
 
 }

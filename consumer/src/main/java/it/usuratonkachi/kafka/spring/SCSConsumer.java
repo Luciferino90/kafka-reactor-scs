@@ -29,8 +29,12 @@ public class SCSConsumer {
 
 	private final KafkaService kafkaService;
 
-	@Value("${default.waittime:10000L}")
-	private final Long waittime = 10000L;
+	@Value("${default.waittime:10000}")
+	private Long waittime;
+	//@Value("${default.waittime:10000}")
+	//public void setWaittime(String waittime){
+	//	this.waittime = Long.valueOf(waittime);
+	//}
 
 	private void waitSleep(){
 		try {

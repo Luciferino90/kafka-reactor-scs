@@ -21,8 +21,11 @@ public class ReactorConsumer {
 	@Value("${spring.profiles:default}")
 	private String profile;
 
-	@Value("${default.waittime:10000L}")
-	private final Long waittime = 10000L;
+	private Long waittime;
+	@Value("${default.waittime:10000}")
+	public void setWaittime(String waittime){
+		this.waittime = Long.valueOf(waittime);
+	}
 
 	private static Boolean started = false;
 
