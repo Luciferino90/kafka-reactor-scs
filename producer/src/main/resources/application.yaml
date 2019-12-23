@@ -3,7 +3,7 @@ spring:
     banner-mode: console
     log-startup-info: false
   application:
-    name: rnd-spring-kafka-speaker
+    name: producer
 
   datasource:
     url: "jdbc:mysql://localhost:3306/kafkacheck?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC&tinyInt1isBit=false&useSSL=false"

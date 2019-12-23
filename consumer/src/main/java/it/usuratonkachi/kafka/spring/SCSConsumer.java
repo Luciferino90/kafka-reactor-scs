@@ -44,8 +44,8 @@ public class SCSConsumer {
 	public void onMail(@Payload Mail msg, @Headers Map<String, Object> headers) {
 		final Mono<Mail> mono = Mono.just(msg)
 				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
-				.doOnNext(e -> waitSleep())
-				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
+				//.doOnNext(e -> waitSleep())
+				.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
 		mono.block();
 	}
