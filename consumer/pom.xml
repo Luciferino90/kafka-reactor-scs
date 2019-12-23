@@ -8,8 +8,8 @@
     <version>0.0.1</version>
     <packaging>jar</packaging>
 
-    <name>rnd-spring-kafka-listener</name>
-    <description>rnd-spring-kafka-listener</description>
+    <name>consumer</name>
+    <description>consumer</description>
 
     <parent>
         <groupId>it.usuratonkachi.kafka</groupId>
