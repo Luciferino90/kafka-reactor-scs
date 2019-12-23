@@ -29,7 +29,7 @@ public class ReactorProducer implements CommandLineRunner {
 
 	@Value("${default.count:10}")
 	private Integer count;
-	@Value("${default.waittime:10000}")
+	@Value("${default.waittime:1000}")
 	private Long waittime;
 
 	private final ReactiveStreamDispatcher<Mail> mailDispatcher;
