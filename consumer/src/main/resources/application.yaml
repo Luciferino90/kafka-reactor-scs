@@ -55,41 +55,37 @@ spring:
           destination: mail-kafka-topic
           contentType: application/json
           consumer:
-            auto-commit-offset: false
+            auto-commit-offset: true
             concurrency: 1
             max-attempts: 3
             partitioned: true
-            partition-count: 10
         message-kafka-in: # consumer
           group: ${spring.application.name}
           destination: message-kafka-topic
           contentType: application/json
           consumer:
-            auto-commit-offset: false
+            auto-commit-offset: true
             concurrency: 1
             max-attempts: 3
             partitioned: true
-            partition-count: 10
         mms-kafka-in: # consumer
           group: ${spring.application.name}
           destination: mms-kafka-topic
           contentType: application/json
           consumer:
-            auto-commit-offset: false
+            auto-commit-offset: true
             concurrency: 1
             max-attempts: 3
             partitioned: true
-            partition-count: 10
         sms-kafka-in: # consumer
           group: ${spring.application.name}
           destination: sms-kafka-topic
           contentType: application/json
           consumer:
-            auto-commit-offset: false
+            auto-commit-offset: true
             concurrency: 1
             max-attempts: 3
             partitioned: true
-            partition-count: 10
 
 server:
   port: 0
