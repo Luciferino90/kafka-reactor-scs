@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ReactorMulti" type="Multirun" factoryName="Multirun" separateTabs="true" startOneByOne="true" markFailedProcess="true" hideSuccessProcess="false" delayTime="0">
+    <runConfiguration name="5ReactorConsumer" type="Multirun" />
+    <runConfiguration name="5ReactorProducer" type="Multirun" />
+    <method v="2" />
+  </configuration>
+</component>

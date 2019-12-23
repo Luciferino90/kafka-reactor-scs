@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="5ReactorProducer" type="Multirun" factoryName="Multirun" separateTabs="true" startOneByOne="false" markFailedProcess="true" hideSuccessProcess="false" delayTime="0">
+    <runConfiguration name="ReactorProducer_1" type="Spring Boot" />
+    <runConfiguration name="ReactorProducer_2" type="Spring Boot" />
+    <runConfiguration name="ReactorProducer_3" type="Spring Boot" />
+    <runConfiguration name="ReactorProducer_4" type="Spring Boot" />
+    <runConfiguration name="ReactorProducer_5" type="Spring Boot" />
+    <method v="2" />
+  </configuration>
+</component>

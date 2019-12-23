@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="5SCSConsumer" type="Multirun" factoryName="Multirun" separateTabs="true" startOneByOne="false" markFailedProcess="true" hideSuccessProcess="false" delayTime="0">
+    <runConfiguration name="SCSConsumer_1" type="Spring Boot" />
+    <runConfiguration name="SCSConsumer_2" type="Spring Boot" />
+    <runConfiguration name="SCSConsumer_3" type="Spring Boot" />
+    <runConfiguration name="SCSConsumer_4" type="Spring Boot" />
+    <runConfiguration name="SCSConsumer_5" type="Spring Boot" />
+    <method v="2" />
+  </configuration>
+</component>

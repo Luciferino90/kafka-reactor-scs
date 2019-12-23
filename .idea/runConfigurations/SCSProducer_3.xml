@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="SCSProducer_3" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" singleton="false">
+    <module name="producer" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="it.usuratonkachi.kafka.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <option name="SPRING_BOOT_MAIN_CLASS" value="it.usuratonkachi.kafka.Application" />
+    <option name="ACTIVE_PROFILES" value="spring,3" />
+    <option name="ALTERNATIVE_JRE_PATH" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
