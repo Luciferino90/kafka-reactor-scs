@@ -31,10 +31,6 @@ public class SCSConsumer {
 
 	@Value("${default.waittime:10000}")
 	private Long waittime;
-	//@Value("${default.waittime:10000}")
-	//public void setWaittime(String waittime){
-	//	this.waittime = Long.valueOf(waittime);
-	//}
 
 	private void waitSleep(){
 		try {

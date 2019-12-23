@@ -29,11 +29,8 @@ public class ReactorProducer implements CommandLineRunner {
 
 	@Value("${default.count:10}")
 	private final Integer count;
-	private Long waittime;
 	@Value("${default.waittime:10000}")
-	public void setWaittime(String waittime){
-		this.waittime = Long.valueOf(waittime);
-	}
+	private Long waittime;
 
 	private final ReactiveStreamDispatcher<Mail> mailDispatcher;
 	private final ReactiveStreamDispatcher<Message> messageDispatcher;
