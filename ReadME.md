@@ -1,7 +1,9 @@
 Launch with profiles:
 -version,number
 
-number is needed to understand which project send/read in parallel run (accepted from 1 to 5)
-version must be `reactor` for Project Reactor library or `spring` for SCS.
+Number is needed to understand which project send/read in parallel run (accepted from 1 to 5)
+Version must be `reactor` for Project Reactor library or `spring` for SCS.
+
+CommonLib contain Reactor Kafka COnfiguration module, Spring JPA Configuration and some common dtos.
 
 TBD

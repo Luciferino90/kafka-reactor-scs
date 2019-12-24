@@ -35,6 +35,7 @@ public class ReactorConsumer {
 
 	@EventListener(ApplicationStartedEvent.class)
 	public void onMessages() {
+		// Spring call ApplicationStartedEvent twice, first for the class, second for its proxy.
 		if (started) return;
 		else started = true;
 		mailDispatcher.listen()
