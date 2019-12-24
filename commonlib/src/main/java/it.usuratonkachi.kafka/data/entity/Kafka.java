@@ -25,7 +25,7 @@ import java.util.UUID;
 public class Kafka implements Serializable {
 
 	@Id
-	private String id = UUID.randomUUID().toString();
+	private String id;
 
 	private String msgid;
 	private String msgtype;

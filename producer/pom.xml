@@ -17,6 +17,14 @@
         <version>0.0.1</version>
     </parent>
 
+    <dependencies>
+        <dependency>
+            <groupId>it.usuratonkachi.kafka</groupId>
+            <artifactId>commonlib</artifactId>
+            <version>0.0.1</version>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <plugin>
@@ -24,22 +32,11 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
             <plugin>
-                <groupId>com.spotify</groupId>
-                <artifactId>dockerfile-maven-plugin</artifactId>
-                <configuration>
-                    <buildArgs>
-                        <JAR_FILE>${project.build.finalName}.jar</JAR_FILE>
-                        <JAR_VERSION>${project.version}</JAR_VERSION>
-                        <START_CLASS>it.usuratonkachi.kafka.Application</START_CLASS>
-                    </buildArgs>
-                </configuration>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>9</source>
-                    <target>9</target>
+                    <source>11</source>
+                    <target>11</target>
                 </configuration>
             </plugin>
         </plugins>

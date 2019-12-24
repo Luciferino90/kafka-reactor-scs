@@ -56,12 +56,14 @@ public class ReactiveKafkaConfiguration<T> {
 		private Map<String, Object> kafkaConsumerConfiguration() {
 			Map<String, Object> configuration = new HashMap<>();
 
-			configuration.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+			configuration.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
 			configuration.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-			configuration.put(ConsumerConfig.GROUP_ID_CONFIG, this.bindingProperties.getGroup());
+			configuration.put(ConsumerConfig.GROUP_ID_CONFIG, bindingProperties.getGroup());
 			configuration.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
 			configuration.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "900000");
 			configuration.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
+			configuration.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100");
+			configuration.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
 
 			/*configuration.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, );
 			configuration.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, );
