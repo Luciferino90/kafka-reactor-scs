@@ -10,8 +10,4 @@ import javax.annotation.PostConstruct;
 @Profile("reactive")
 @ComponentScan(basePackages = { "it.usuratonkachi.kafka.reactor", "it.usuratonkachi.kafka.data" })
 public class ReactorEntryPoint {
-	@PostConstruct
-	private void init(){
-		System.out.println("");
-	}
 }

@@ -10,8 +10,4 @@ import javax.annotation.PostConstruct;
 @Profile("spring")
 @ComponentScan(basePackages = { "it.usuratonkachi.kafka.spring", "it.usuratonkachi.kafka.data" })
 public class SCSEntryPoint {
-	@PostConstruct
-	private void init(){
-		System.out.println("");
-	}
 }
