@@ -63,7 +63,9 @@ public class ReactiveKafkaConfiguration<T> {
 			configuration.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "900000");
 			configuration.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
 			configuration.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100");
-			configuration.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
+			configuration.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_uncommitted");
+			//configuration.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RoundRobinAssignor");
+			configuration.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RangeAssignor");
 
 			/*configuration.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, );
 			configuration.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, );

@@ -29,13 +29,13 @@ public class SCSProducer implements CommandLineRunner {
 	private String profile;
 
 	@Value("${default.count:10}")
-	private final Integer count;
+	private Integer count;
 	@Value("${default.waittime:10000}")
 	private Long waittime;
 
 	private final KafkaService kafkaService;
 
-	AtomicInteger base = new AtomicInteger(0);
+	private AtomicInteger base = new AtomicInteger(0);
 
 	@Autowired
 	@Qualifier(Streams.MAIL_CHANNEL_OUTPUT)
@@ -94,7 +94,8 @@ public class SCSProducer implements CommandLineRunner {
 						.build()
 				)
 				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.map(r -> mailChannelOutput.send(MessageBuilder.withPayload(r).build()));
+				.map(r -> mailChannelOutput.send(MessageBuilder.withPayload(r).build()))
+				.doOnNext(r-> System.out.println(""));
 	}
 
 		/*private Flux<Boolean> sendMessage(Integer count, Integer baseCount){

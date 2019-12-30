@@ -4,7 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
-@SpringBootApplication(scanBasePackages = { "it.usuratonkachi.kafka.reactor", "it.usuratonkachi.kafka.data" })
+@SpringBootApplication(scanBasePackages = { "it.usuratonkachi.kafka.config" })
 @EnableJpaRepositories(basePackages = { "it.usuratonkachi.kafka.data" })
 public class Application {
 

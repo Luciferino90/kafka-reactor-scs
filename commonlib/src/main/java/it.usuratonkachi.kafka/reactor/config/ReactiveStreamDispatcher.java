@@ -44,7 +44,8 @@ public class ReactiveStreamDispatcher<T> {
 
 	public Flux<Message<T>> listen() {
 		if (reactiveKafkaConfiguration.getConsumer() != null)
-			return reactiveKafkaConfiguration.getConsumer().receiveAutoAck().flatMap(e -> e).map(this::consumerRecordToMessage);
+			return reactiveKafkaConfiguration.getConsumer().receiveAutoAck().flatMap(e -> e).map(this::consumerRecordToMessage)
+					.doOnNext(r -> System.out.println(""));
 		else
 			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
 	}
@@ -69,7 +70,8 @@ public class ReactiveStreamDispatcher<T> {
 		ProducerRecord<String, T> producer = messageToProducerRecord(message);
 		SenderRecord<String, T, Object> senderRecord = SenderRecord.create(producer, null);
 		Flux<SenderRecord<String, T, Object>> messageSource = Flux.from(Mono.defer(() -> Mono.just(senderRecord)));
-		return reactiveKafkaConfiguration.getProducer().send(messageSource);
+		return reactiveKafkaConfiguration.getProducer().send(messageSource)
+				.doOnNext(e->System.out.println(""));
 	}
 
 	private ProducerRecord<String, T> messageToProducerRecord(Message<T> message){
