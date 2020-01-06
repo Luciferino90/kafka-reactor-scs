@@ -87,7 +87,7 @@ defaut:
 
 logging:
   level:
-    root: DEBUG
+    root: INFO
     it: ERROR
 ---
 spring:

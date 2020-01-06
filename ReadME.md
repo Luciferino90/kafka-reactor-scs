@@ -7,3 +7,6 @@ Version must be `reactor` for Project Reactor library or `spring` for SCS.
 CommonLib contain Reactor Kafka COnfiguration module, Spring JPA Configuration and some common dtos.
 
 TBD
+
+
+ConsumerCoordinator.refreshCommittedOffsetsIfNeeded for reactive part doesn't work
