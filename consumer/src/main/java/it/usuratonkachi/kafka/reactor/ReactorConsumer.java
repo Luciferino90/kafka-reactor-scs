@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.messaging.MessageHeaders;
 import org.springframework.stereotype.Component;
 
 import java.util.function.Function;
@@ -37,8 +38,10 @@ public class ReactorConsumer {
 	@Autowired
 	private KafkaService kafkaService;
 
-	Function<Mail, Void> mailListener = r -> {
-		kafkaService.ackIfNotYetLogOtherwise(r.getMsgNum(), r.getProducer(), r.getClass().getSimpleName());
+	Function<org.springframework.messaging.Message<Mail>, Void> mailListener = kafkaMessage -> {
+		Mail payload = kafkaMessage.getPayload();
+		MessageHeaders headers = kafkaMessage.getHeaders();
+		kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
 		try {
 			Thread.sleep(waittime);
 		} catch (InterruptedException ex) {
@@ -47,8 +50,10 @@ public class ReactorConsumer {
 		return null;
 	};
 
-	Function<Message, Void> messageListener = r -> {
-		kafkaService.ackIfNotYetLogOtherwise(r.getMsgNum(), r.getProducer(), r.getClass().getSimpleName());
+	Function<org.springframework.messaging.Message<Message>, Void> messageListener = kafkaMessage -> {
+		Message payload = kafkaMessage.getPayload();
+		MessageHeaders headers = kafkaMessage.getHeaders();
+		kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
 		try {
 			Thread.sleep(waittime);
 		} catch (InterruptedException ex) {
@@ -57,8 +62,10 @@ public class ReactorConsumer {
 		return null;
 	};
 
-	Function<Mms, Void> mmsListener = r -> {
-		kafkaService.ackIfNotYetLogOtherwise(r.getMsgNum(), r.getProducer(), r.getClass().getSimpleName());
+	Function<org.springframework.messaging.Message<Mms>, Void> mmsListener = kafkaMessage -> {
+		Mms payload = kafkaMessage.getPayload();
+		MessageHeaders headers = kafkaMessage.getHeaders();
+		kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
 		try {
 			Thread.sleep(waittime);
 		} catch (InterruptedException ex) {
@@ -67,8 +74,10 @@ public class ReactorConsumer {
 		return null;
 	};
 
-	Function<Sms, Void> smsListener = r -> {
-		kafkaService.ackIfNotYetLogOtherwise(r.getMsgNum(), r.getProducer(), r.getClass().getSimpleName());
+	Function<org.springframework.messaging.Message<Sms>, Void> smsListener = kafkaMessage -> {
+		Sms payload = kafkaMessage.getPayload();
+		MessageHeaders headers = kafkaMessage.getHeaders();
+		kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
 		try {
 			Thread.sleep(waittime);
 		} catch (InterruptedException ex) {

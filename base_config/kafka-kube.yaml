@@ -44,6 +44,9 @@ spec:
       containers:
         - name: kafka
           image: johnnypark/kafka-zookeeper
+          env:
+            - name: ADVERTISED_HOST
+              value: 127.0.0.1
           resources: {}
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
