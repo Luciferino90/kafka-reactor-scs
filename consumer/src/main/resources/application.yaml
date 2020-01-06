@@ -42,33 +42,23 @@ spring:
         binder:
           brokers: localhost:9092
           auto-add-partitions: true
-          configuration:
-            processing.guarantee: exactly-once
         bindings:
           mail-kafka-in:
-            auto-commit-offset: true
-            ack-each-record: true
             consumer:
               configuration:
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
           message-kafka-in:
-            auto-commit-offset: true
-            ack-each-record: true
             consumer:
               configuration:
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
           mms-kafka-in:
-            auto-commit-offset: true
-            ack-each-record: true
             consumer:
               configuration:
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
           sms-kafka-in:
-            auto-commit-offset: true
-            ack-each-record: true
             consumer:
               configuration:
                 max.poll.records: 1

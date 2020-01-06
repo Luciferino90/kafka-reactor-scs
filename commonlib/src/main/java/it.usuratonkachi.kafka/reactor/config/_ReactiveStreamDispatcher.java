@@ -1,5 +1,6 @@
 package it.usuratonkachi.kafka.reactor.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -19,54 +20,78 @@ import reactor.util.function.Tuples;
 
 import java.io.Serializable;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-public class ReactiveStreamDispatcherBA<T> {
+@Slf4j
+@Deprecated // Use ByteArray version
+public class _ReactiveStreamDispatcher<T> {
 
-	private final ReactiveKafkaConfigurationBA reactiveKafkaConfiguration;
+	private final _ReactiveKafkaConfiguration<T> reactiveKafkaConfiguration;
 
-	private Class<T> clazz;
-
-	@SuppressWarnings("unchecked")
-	private Class<T> getGenericTypeAtRuntime(){
-		return (Class<T>) getClass();
+	public _ReactiveStreamDispatcher(ReactiveKafkaProperties reactiveKafkaProperties, String labelTopicName) {
+		this.reactiveKafkaConfiguration = new _ReactiveKafkaConfiguration<>(reactiveKafkaProperties, labelTopicName);
 	}
 
-	public ReactiveStreamDispatcherBA(ReactiveKafkaProperties reactiveKafkaProperties, String labelTopicName){
-		this.clazz = getGenericTypeAtRuntime();
-		this.reactiveKafkaConfiguration = new ReactiveKafkaConfigurationBA(reactiveKafkaProperties, labelTopicName);
-	}
-
-	public ReactiveStreamDispatcherBA(ReactiveKafkaConfigurationBA reactiveKafkaConfiguration) {
-		this.clazz = getGenericTypeAtRuntime();
+	public _ReactiveStreamDispatcher(_ReactiveKafkaConfiguration<T> reactiveKafkaConfiguration) {
 		this.reactiveKafkaConfiguration = reactiveKafkaConfiguration;
 	}
 
-	public Flux<Message<T>> _listen() {
-
+	public Flux<Message<T>> listen() {
 		if (reactiveKafkaConfiguration.getConsumer() != null)
 			return reactiveKafkaConfiguration.getConsumer().receive().map(this::receiverRecordToMessage);
 		else
 			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
 	}
 
-	public Flux<Message<T>> listen() {
+	public void listen(Function<T, Void> function) {
+		if (reactiveKafkaConfiguration.getConsumer() != null)
+			reactiveKafkaConfiguration.getConsumer().receive()
+					.doOnNext(r -> {
+						try {
+							Message<T> message = receiverRecordToMessage(r);
+							function.apply(message.getPayload());
+							r.receiverOffset().acknowledge();
+							r.receiverOffset().commit();
+						} catch (Exception ex) {
+							log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+						}
+					})
+					.subscribe();
+		else
+			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
+	}
+
+	public void _listen(Function<Message<T>, Void> function) {
+		if (reactiveKafkaConfiguration.getConsumer() != null)
+			reactiveKafkaConfiguration.getConsumer().receive()
+					.doOnNext(r -> {
+						Message<T> message = receiverRecordToMessage(r);
+						function.apply(message);
+						r.receiverOffset().acknowledge();
+					})
+					.subscribe();
+		else
+			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
+	}
+
+	public Flux<Message<T>> _listen() {
 		if (reactiveKafkaConfiguration.getConsumer() != null)
 			return reactiveKafkaConfiguration.getConsumer().receiveAutoAck().flatMap(e -> e).map(this::consumerRecordToMessage);
 		else
 			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
 	}
 
-	public KafkaReceiver<String, byte[]> listener() {
+	public KafkaReceiver<String, T> listener() {
 		if (reactiveKafkaConfiguration.getConsumer() != null)
 			return reactiveKafkaConfiguration.getConsumer();
 		else
 			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
 	}
 
-	public Flux<SenderResult<Object>> send(Message<byte[]> message) {
+	public Flux<SenderResult<Object>> send(Message<T> message) {
 		if (reactiveKafkaConfiguration.getProducer() != null) {
 			return internalSend(message);
 		} else {
@@ -75,37 +100,35 @@ public class ReactiveStreamDispatcherBA<T> {
 		}
 	}
 
-	private Flux<SenderResult<Object>> internalSend(Message<byte[]> message){
-		ProducerRecord<String, byte[]> producer = messageToProducerRecord(message);
-		SenderRecord<String, byte[], Object> senderRecord = SenderRecord.create(producer, null);
-		Flux<SenderRecord<String, byte[], Object>> messageSource = Flux.from(Mono.defer(() -> Mono.just(senderRecord)));
+	private Flux<SenderResult<Object>> internalSend(Message<T> message){
+		ProducerRecord<String, T> producer = messageToProducerRecord(message);
+		SenderRecord<String, T, Object> senderRecord = SenderRecord.create(producer, null);
+		Flux<SenderRecord<String, T, Object>> messageSource = Flux.from(Mono.defer(() -> Mono.just(senderRecord)));
 		return reactiveKafkaConfiguration.getProducer().send(messageSource);
 	}
 
-	private ProducerRecord<String, byte[]> messageToProducerRecord(Message<byte[]> message){
+	private ProducerRecord<String, T> messageToProducerRecord(Message<T> message){
 		return new ProducerRecord<>(reactiveKafkaConfiguration.getTopicName(), null, null, null, message.getPayload(), headersToProducerRecordHeaders(message));
 	}
 
-	private Iterable<Header> headersToProducerRecordHeaders(Message<byte[]> message){
+	private Iterable<Header> headersToProducerRecordHeaders(Message<T> message){
 		return message.getHeaders().entrySet().stream()
 				.filter(entryHeader -> entryHeader.getValue() instanceof Serializable)
 				.map(entryHeader -> new RecordHeader(entryHeader.getKey(), SerializationUtils.serialize((Serializable) entryHeader.getValue())))
 				.collect(Collectors.toList());
 	}
 
-	private Message<T> receiverRecordToMessage(ReceiverRecord<String, byte[]> receiverRecord) {
+	private Message<T> receiverRecordToMessage(ReceiverRecord<String, T> receiverRecord) {
 		MessageHeaders messageHeaders = receiverRecordToHeaders(receiverRecord);
-		T deserializedValue = SerializationUtils.deserialize(receiverRecord.value());
-		return new GenericMessage<T>(deserializedValue, messageHeaders);
+		return new GenericMessage<>(receiverRecord.value(), messageHeaders);
 	}
 
-	private Message<T> consumerRecordToMessage(ConsumerRecord<String, byte[]> consumerRecord){
+	private Message<T> consumerRecordToMessage(ConsumerRecord<String, T> consumerRecord){
 		MessageHeaders messageHeaders = receiverRecordToHeaders(consumerRecord);
-		T deserializedValue = SerializationUtils.deserialize(consumerRecord.value());
-		return new GenericMessage<T>(deserializedValue, messageHeaders);
+		return new GenericMessage<>(consumerRecord.value(), messageHeaders);
 	}
 
-	private MessageHeaders receiverRecordToHeaders(ReceiverRecord<String, byte[]> receiverRecord){
+	private MessageHeaders receiverRecordToHeaders(ReceiverRecord<String, T> receiverRecord){
 		Map<String, Object> headersMap = StreamSupport.stream(receiverRecord.headers().spliterator(), false)
 				.map(header -> {
 					Object headerValue = SerializationUtils.deserialize(header.value());
@@ -115,15 +138,11 @@ public class ReactiveStreamDispatcherBA<T> {
 		return new MessageHeaders(headersMap);
 	}
 
-	private MessageHeaders receiverRecordToHeaders(ConsumerRecord<String, byte[]> consumerRecord){
+	private MessageHeaders receiverRecordToHeaders(ConsumerRecord<String, T> consumerRecord){
 		Map<String, Object> headersMap = StreamSupport.stream(consumerRecord.headers().spliterator(), false)
 				.map(header -> {
-					try {
-						Object headerValue = SerializationUtils.deserialize(header.value());
-						return Tuples.of(header.key(), headerValue);
-					} catch (Exception ex){
-						throw new RuntimeException(ex);
-					}
+					Object headerValue = SerializationUtils.deserialize(header.value());
+					return Tuples.of(header.key(), headerValue);
 				})
 				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
 		return new MessageHeaders(headersMap);

@@ -13,24 +13,20 @@ import org.springframework.stereotype.Service;
 @Service
 public class ReactiveKafkaConfiguratorProject extends ReactiveKafkaConfigurator {
 
-	@Bean
-	ReactiveStreamDispatcher<Mail> mailDispatcher(){
-		return new ReactiveStreamDispatcher<>(reactiveKafkaProperties, Streams.MAIL_CHANNEL_INPUT);
+	@Bean ReactiveStreamDispatcher<Mail> mailDispatcher(){
+		return new ReactiveStreamDispatcher<>(Mail.class, reactiveKafkaProperties, Streams.MAIL_CHANNEL_INPUT);
 	}
 
-	@Bean
-	ReactiveStreamDispatcher<Message> messageDispatcher(){
-		return new ReactiveStreamDispatcher<>(reactiveKafkaProperties, Streams.MESSAGE_CHANNEL_INPUT);
+	@Bean ReactiveStreamDispatcher<Message> messageDispatcher(){
+		return new ReactiveStreamDispatcher<>(Message.class, reactiveKafkaProperties, Streams.MESSAGE_CHANNEL_INPUT);
 	}
 
-	@Bean
-	ReactiveStreamDispatcher<Mms> mmsDispatcher(){
-		return new ReactiveStreamDispatcher<>(reactiveKafkaProperties, Streams.MMS_CHANNEL_INPUT);
+	@Bean ReactiveStreamDispatcher<Mms> mmsDispatcher(){
+		return new ReactiveStreamDispatcher<>(Mms.class, reactiveKafkaProperties, Streams.MMS_CHANNEL_INPUT);
 	}
 
-	@Bean
-	ReactiveStreamDispatcher<Sms> smsDispatcher(){
-		return new ReactiveStreamDispatcher<>(reactiveKafkaProperties, Streams.SMS_CHANNEL_INPUT);
+	@Bean ReactiveStreamDispatcher<Sms> smsDispatcher(){
+		return new ReactiveStreamDispatcher<>(Sms.class, reactiveKafkaProperties, Streams.SMS_CHANNEL_INPUT);
 	}
 
 }

@@ -1,7 +1,9 @@
 package it.usuratonkachi.kafka.reactor.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.SerializationUtils;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -19,20 +21,22 @@ import reactor.util.function.Tuples;
 
 import java.io.Serializable;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+@Slf4j
 public class ReactiveStreamDispatcher<T> {
 
-	private final ReactiveKafkaConfiguration<T> reactiveKafkaConfiguration;
+	private final ReactiveKafkaConfiguration reactiveKafkaConfiguration;
 
-	public ReactiveStreamDispatcher(ReactiveKafkaProperties reactiveKafkaProperties, String labelTopicName) {
-		this.reactiveKafkaConfiguration = new ReactiveKafkaConfiguration<>(reactiveKafkaProperties, labelTopicName);
-	}
+	private Class<T> clazz;
 
-	public ReactiveStreamDispatcher(ReactiveKafkaConfiguration<T> reactiveKafkaConfiguration) {
-		this.reactiveKafkaConfiguration = reactiveKafkaConfiguration;
+	public ReactiveStreamDispatcher(Class<T> clazz, ReactiveKafkaProperties reactiveKafkaProperties, String labelTopicName){
+		this.clazz = clazz;
+		this.reactiveKafkaConfiguration = new ReactiveKafkaConfiguration(reactiveKafkaProperties, labelTopicName);
 	}
 
 	public Flux<Message<T>> _listen() {
@@ -44,13 +48,44 @@ public class ReactiveStreamDispatcher<T> {
 
 	public Flux<Message<T>> listen() {
 		if (reactiveKafkaConfiguration.getConsumer() != null)
-			return reactiveKafkaConfiguration.getConsumer().receiveAutoAck().flatMap(e -> e).map(this::consumerRecordToMessage)
-					.doOnNext(r -> System.out.println(""));
+			return reactiveKafkaConfiguration.getConsumer().receive().map(this::receiverRecordToMessage);
 		else
 			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
 	}
 
-	public KafkaReceiver<String, T> listener() {
+	public void listen(Function<T, Void> function) {
+		if (reactiveKafkaConfiguration.getConsumer() != null)
+			reactiveKafkaConfiguration.getConsumer().receive()
+					.doOnNext(r -> {
+						try {
+							Message<T> message = receiverRecordToMessage(r);
+							function.apply(message.getPayload());
+							r.receiverOffset().acknowledge();
+							r.receiverOffset().commit();
+							// TODO In case of businessException should acknowledge and commit.
+						} catch (Exception ex) {
+							log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+						}
+					})
+					.subscribe();
+		else
+			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
+	}
+
+	public void _listen(Function<Message<T>, Void> function) {
+		if (reactiveKafkaConfiguration.getConsumer() != null)
+			reactiveKafkaConfiguration.getConsumer().receive()
+					.doOnNext(r -> {
+						Message<T> message = receiverRecordToMessage(r);
+						function.apply(message);
+						r.receiverOffset().acknowledge();
+					})
+					.subscribe();
+		else
+			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
+	}
+
+	public KafkaReceiver<byte[], byte[]> listener() {
 		if (reactiveKafkaConfiguration.getConsumer() != null)
 			return reactiveKafkaConfiguration.getConsumer();
 		else
@@ -67,15 +102,20 @@ public class ReactiveStreamDispatcher<T> {
 	}
 
 	private Flux<SenderResult<Object>> internalSend(Message<T> message){
-		ProducerRecord<String, T> producer = messageToProducerRecord(message);
-		SenderRecord<String, T, Object> senderRecord = SenderRecord.create(producer, null);
-		Flux<SenderRecord<String, T, Object>> messageSource = Flux.from(Mono.defer(() -> Mono.just(senderRecord)));
-		return reactiveKafkaConfiguration.getProducer().send(messageSource)
-				.doOnNext(e->System.out.println(""));
+		ProducerRecord<byte[], byte[]> producer = messageToProducerRecord(message);
+		SenderRecord<byte[], byte[], Object> senderRecord = SenderRecord.create(producer, null);
+		Flux<SenderRecord<byte[], byte[], Object>> messageSource = Flux.from(Mono.defer(() -> Mono.just(senderRecord)));
+		return reactiveKafkaConfiguration.getProducer().send(messageSource);
 	}
 
-	private ProducerRecord<String, T> messageToProducerRecord(Message<T> message){
-		return new ProducerRecord<>(reactiveKafkaConfiguration.getTopicName(), null, null, null, message.getPayload(), headersToProducerRecordHeaders(message));
+	private ProducerRecord<byte[], byte[]> messageToProducerRecord(Message<T> message){
+		ObjectMapper objectMapper = new ObjectMapper();
+		try {
+			byte[] payload = objectMapper.writeValueAsBytes(message.getPayload());
+			return new ProducerRecord<>(reactiveKafkaConfiguration.getTopicName(), null, null, null, payload, headersToProducerRecordHeaders(message));
+		} catch (JsonProcessingException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	private Iterable<Header> headersToProducerRecordHeaders(Message<T> message){
@@ -85,30 +125,46 @@ public class ReactiveStreamDispatcher<T> {
 				.collect(Collectors.toList());
 	}
 
-	private Message<T> receiverRecordToMessage(ReceiverRecord<String, T> receiverRecord) {
+	@SuppressWarnings("unchecked")
+	private Message<T> receiverRecordToMessage(ReceiverRecord<byte[], byte[]> receiverRecord) {
 		MessageHeaders messageHeaders = receiverRecordToHeaders(receiverRecord);
-		return new GenericMessage<>(receiverRecord.value(), messageHeaders);
+		T deserializedValue = null;
+		try {
+			Class<T> c = (Class<T>) Class.forName((String) Optional.ofNullable(messageHeaders.get("__TypeId__")).orElse(clazz.getName()));
+			deserializedValue = deserializeObject(receiverRecord.value(), c);
+		} catch (ClassNotFoundException e) {
+			log.error("Could not deserialize class " + messageHeaders.get("__TypeId__"));
+			deserializeObject(receiverRecord.value());
+		}
+		assert deserializedValue != null;
+		return new GenericMessage<>(deserializedValue, messageHeaders);
 	}
 
-	private Message<T> consumerRecordToMessage(ConsumerRecord<String, T> consumerRecord){
-		MessageHeaders messageHeaders = receiverRecordToHeaders(consumerRecord);
-		return new GenericMessage<>(consumerRecord.value(), messageHeaders);
+
+	private T deserializeObject(byte[] serialized){
+		return deserializeObject(serialized, clazz);
 	}
 
-	private MessageHeaders receiverRecordToHeaders(ReceiverRecord<String, T> receiverRecord){
+	@SuppressWarnings("unchecked")
+	private T deserializeObject(byte[] serialized, Class<T> clazz){
+		ObjectMapper objectMapper = new ObjectMapper();
+		try {
+			Map<String, Object> content = objectMapper.readValue(serialized, Map.class);
+			if (content != null && content.containsKey("payload"))
+				return objectMapper.convertValue(content.get("payload"), clazz);
+			else
+				return objectMapper.convertValue(content, clazz);
+		} catch (Exception ex) {
+			String errorMessage = "Cannot deserialize " + new String(serialized);
+			log.error(errorMessage, ex);
+			throw new RuntimeException(errorMessage, ex);
+		}
+	}
+
+	private MessageHeaders receiverRecordToHeaders(ReceiverRecord<byte[], byte[]> receiverRecord){
 		Map<String, Object> headersMap = StreamSupport.stream(receiverRecord.headers().spliterator(), false)
 				.map(header -> {
-					Object headerValue = SerializationUtils.deserialize(header.value());
-					return Tuples.of(header.key(), headerValue);
-				})
-				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
-		return new MessageHeaders(headersMap);
-	}
-
-	private MessageHeaders receiverRecordToHeaders(ConsumerRecord<String, T> consumerRecord){
-		Map<String, Object> headersMap = StreamSupport.stream(consumerRecord.headers().spliterator(), false)
-				.map(header -> {
-					Object headerValue = SerializationUtils.deserialize(header.value());
+					Object headerValue = new String(header.value());
 					return Tuples.of(header.key(), headerValue);
 				})
 				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
