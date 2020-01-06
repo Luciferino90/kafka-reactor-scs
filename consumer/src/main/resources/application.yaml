@@ -111,8 +111,8 @@ defaut:
 
 logging:
   level:
-    root: INFO
-    #org: ERROR
+    root: DEBUG
+    it: ERROR
 ---
 spring:
   profiles: 1

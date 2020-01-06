@@ -87,8 +87,8 @@ defaut:
 
 logging:
   level:
-    root: INFO
-    org: INFO
+    root: DEBUG
+    it: ERROR
 ---
 spring:
   profiles: 1

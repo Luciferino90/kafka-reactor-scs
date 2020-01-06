@@ -2,6 +2,9 @@ package it.usuratonkachi.kafka.spring;
 
 import it.usuratonkachi.kafka.data.service.KafkaService;
 import it.usuratonkachi.kafka.dto.Mail;
+import it.usuratonkachi.kafka.dto.Message;
+import it.usuratonkachi.kafka.dto.Mms;
+import it.usuratonkachi.kafka.dto.Sms;
 import it.usuratonkachi.kafka.spring.streamconfig.Streams;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,8 +33,8 @@ public class SCSProducer implements CommandLineRunner {
 
 	@Value("${default.count:10}")
 	private Integer count;
-	@Value("${default.waittime:10000}")
-	private Long waittime;
+	//@Value("${default.waittime:10000}")
+	private Long waittime = 0L;
 
 	private final KafkaService kafkaService;
 
@@ -93,12 +96,11 @@ public class SCSProducer implements CommandLineRunner {
 						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
 						.build()
 				)
-				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.map(r -> mailChannelOutput.send(MessageBuilder.withPayload(r).build()))
-				.doOnNext(r-> System.out.println(""));
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				.map(r -> mailChannelOutput.send(r));
 	}
 
-		/*private Flux<Boolean> sendMessage(Integer count, Integer baseCount){
+		private Flux<Boolean> sendMessage(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -113,8 +115,8 @@ public class SCSProducer implements CommandLineRunner {
 						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
 						.build()
 				)
-				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.map(r -> messageChannelOutput.send(MessageBuilder.withPayload(r).build()));
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				.map(r -> messageChannelOutput.send(r));
 	}
 
 	private Flux<Boolean> sendMms(Integer count, Integer baseCount){
@@ -132,8 +134,8 @@ public class SCSProducer implements CommandLineRunner {
 						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
 						.build()
 				)
-				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.map(r -> mmsChannelOutput.send(MessageBuilder.withPayload(r).build()));
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				.map(r -> mmsChannelOutput.send(r));
 	}
 
 	private Flux<Boolean> sendSms(Integer count, Integer baseCount){
@@ -151,8 +153,8 @@ public class SCSProducer implements CommandLineRunner {
 						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
 						.build()
 				)
-				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.map(r -> smsChannelOutput.send(MessageBuilder.withPayload(r).build()));
-	}*/
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				.map(r -> smsChannelOutput.send(r));
+	}
 
 }

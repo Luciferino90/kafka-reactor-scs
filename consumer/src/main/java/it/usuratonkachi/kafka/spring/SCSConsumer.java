@@ -23,14 +23,13 @@ import java.util.Map;
 
 @Component
 @Slf4j
-@EnableBinding(Processor.class)
 @RequiredArgsConstructor
 public class SCSConsumer {
 
 	private final KafkaService kafkaService;
 
-	@Value("${default.waittime:1000}")
-	private Long waittime;
+	//@Value("${default.waittime:1000}")
+	private Long waittime = 0L;
 
 	private void waitSleep(){
 		try {

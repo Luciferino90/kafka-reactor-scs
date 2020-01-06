@@ -63,7 +63,7 @@ public class ReactorProducer implements CommandLineRunner {
 						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
 						.build()
 				)
-				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
 				.flatMap(mailDispatcher::send);
 	}
 
@@ -82,7 +82,7 @@ public class ReactorProducer implements CommandLineRunner {
 						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
 						.build()
 				)
-				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
 				.flatMap(messageDispatcher::send);
 	}
 
@@ -101,7 +101,7 @@ public class ReactorProducer implements CommandLineRunner {
 						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
 						.build()
 				)
-				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
 				.flatMap(mmsDispatcher::send);
 	}
 
@@ -120,7 +120,7 @@ public class ReactorProducer implements CommandLineRunner {
 						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
 						.build()
 				)
-				.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
 				.flatMap(smsDispatcher::send);
 	}
 

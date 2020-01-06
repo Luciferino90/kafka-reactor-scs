@@ -13,7 +13,6 @@ import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderOptions;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collector;
@@ -53,53 +52,16 @@ public class ReactiveKafkaConfiguration {
 		}
 
 		private Map<String, Object> kafkaConsumerConfiguration() {
-			Map<String, Object> configuration = new HashMap<>();
-
-			configuration.put(ConsumerConfig.CLIENT_ID_CONFIG, bindingProperties.getDestination() + "-" + UUID.randomUUID().toString());
-			configuration.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-			configuration.put(ConsumerConfig.GROUP_ID_CONFIG, bindingProperties.getDestination());
-			configuration.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
-			configuration.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "900000");
-			configuration.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1");
-			configuration.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RangeAssignor");
-			//configuration.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-			//configuration.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100");
-
-			configuration.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-			//configuration.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100");
-
-			/*configuration.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, );
-			configuration.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, );
-			configuration.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, );
-			configuration.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, );
-			configuration.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, );
-			configuration.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, );
-			configuration.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, );
-			configuration.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, );
-			configuration.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, );
-			configuration.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, );
-			configuration.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, );
-			configuration.put(ConsumerConfig.SEND_BUFFER_CONFIG, );
-			configuration.put(ConsumerConfig.RECEIVE_BUFFER_CONFIG, );
-			configuration.put(ConsumerConfig.CLIENT_ID_CONFIG, );
-			configuration.put(ConsumerConfig.RECONNECT_BACKOFF_MS_CONFIG, );
-			configuration.put(ConsumerConfig.RETRY_BACKOFF_MS_CONFIG, );
-			configuration.put(ConsumerConfig.METRICS_SAMPLE_WINDOW_MS_CONFIG, );
-			configuration.put(ConsumerConfig.METRICS_NUM_SAMPLES_CONFIG, );
-			configuration.put(ConsumerConfig.METRICS_RECORDING_LEVEL_CONFIG, );
-			configuration.put(ConsumerConfig.METRIC_REPORTER_CLASSES_CONFIG, );
-			configuration.put(ConsumerConfig.CHECK_CRCS_CONFIG, );
-			configuration.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, );
-			configuration.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, );
-			configuration.put(ConsumerConfig.CONNECTIONS_MAX_IDLE_MS_CONFIG, );
-			configuration.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, );
-			configuration.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, );
-			configuration.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, );
-			configuration.put(ConsumerConfig.EXCLUDE_INTERNAL_TOPICS_CONFIG, );
-			configuration.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, );
-			configuration.put(ConsumerConfig.DEFAULT_ISOLATION_LEVEL, );*/
-
-			return configuration;
+			return Map.of(
+					ConsumerConfig.CLIENT_ID_CONFIG, bindingProperties.getDestination() + "-" + UUID.randomUUID().toString(),
+					ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
+					ConsumerConfig.GROUP_ID_CONFIG, bindingProperties.getDestination(),
+					ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers(),
+					ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "900000",
+					ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1",
+					ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RangeAssignor",
+					ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false"
+			);
 		}
 
 		private ReceiverOptions<byte[], byte[]> kafkaReceiverOptions() {
@@ -131,17 +93,16 @@ public class ReactiveKafkaConfiguration {
 		}
 
 		private Map<String, Object> kafkaProducerConfiguration() {
-			Map<String, Object> configuration = new HashMap<>();
-			configuration.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
-			configuration.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 1);
-			configuration.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
-			configuration.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
-			return configuration;
+			return Map.of(
+					ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers(),
+					ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 1,
+					ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class,
+					ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class
+			);
 		}
 
 		private SenderOptions<byte[], byte[]> kafkaSenderOptions() {
-			SenderOptions<byte[], byte[]> options = SenderOptions.create(kafkaProducerConfiguration());
-			return options;
+			return SenderOptions.create(kafkaProducerConfiguration());
 		}
 
 		private KafkaSender<byte[], byte[]> reactiveKafkaSender() {
