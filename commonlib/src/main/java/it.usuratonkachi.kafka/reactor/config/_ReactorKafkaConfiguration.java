@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Deprecated // Use ByteArray Version
-public class _ReactiveKafkaConfiguration<T> {
+public class _ReactorKafkaConfiguration<T> {
 
 	@Getter
 	private String topicName;
@@ -34,11 +34,11 @@ public class _ReactiveKafkaConfiguration<T> {
 	@Getter
 	private KafkaSender<String, T> producer;
 
-	public _ReactiveKafkaConfiguration(ReactiveKafkaProperties reactiveKafkaProperties, String labelTopicName){
+	public _ReactorKafkaConfiguration(ReactorKafkaProperties reactorKafkaProperties, String labelTopicName){
 		labelName = labelTopicName;
-		topicName = reactiveKafkaProperties.getBindingServiceProperties().getBindingDestination(labelName);
-		consumer = new ConsumerConfiguration<T>(reactiveKafkaProperties.getKafkaProperties(), reactiveKafkaProperties.getBindingServiceProperties().getBindingProperties(labelName)).builder();
-		producer = new ProducerConfiguration<T>(reactiveKafkaProperties.getKafkaProperties(), reactiveKafkaProperties.getBindingServiceProperties().getBindingProperties(labelName)).builder();
+		topicName = reactorKafkaProperties.getBindingServiceProperties().getBindingDestination(labelName);
+		consumer = new ConsumerConfiguration<T>(reactorKafkaProperties.getKafkaProperties(), reactorKafkaProperties.getBindingServiceProperties().getBindingProperties(labelName)).builder();
+		producer = new ProducerConfiguration<T>(reactorKafkaProperties.getKafkaProperties(), reactorKafkaProperties.getBindingServiceProperties().getBindingProperties(labelName)).builder();
 	}
 
 	static class ConsumerConfiguration<T> {

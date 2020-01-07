@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @RequiredArgsConstructor
 @EnableConfigurationProperties(value = { BindingServiceProperties.class })
-public class ReactiveKafkaProperties {
+public class ReactorKafkaProperties {
 
 	@Getter
 	private final KafkaProperties kafkaProperties;

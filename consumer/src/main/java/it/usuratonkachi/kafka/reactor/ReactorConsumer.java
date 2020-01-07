@@ -5,7 +5,7 @@ import it.usuratonkachi.kafka.dto.Mail;
 import it.usuratonkachi.kafka.dto.Message;
 import it.usuratonkachi.kafka.dto.Mms;
 import it.usuratonkachi.kafka.dto.Sms;
-import it.usuratonkachi.kafka.reactor.config.ReactiveStreamDispatcher;
+import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +14,7 @@ import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
 import java.util.function.Function;
 
@@ -30,15 +31,15 @@ public class ReactorConsumer {
 
 	private static Boolean started = false;
 
-	private final ReactiveStreamDispatcher<Mail> mailDispatcher;
-	private final ReactiveStreamDispatcher<Message> messageDispatcher;
-	private final ReactiveStreamDispatcher<Mms> mmsDispatcher;
-	private final ReactiveStreamDispatcher<Sms> smsDispatcher;
+	private final ReactorStreamDispatcher<Mail> mailDispatcher;
+	private final ReactorStreamDispatcher<Message> messageDispatcher;
+	private final ReactorStreamDispatcher<Mms> mmsDispatcher;
+	private final ReactorStreamDispatcher<Sms> smsDispatcher;
 
 	@Autowired
 	private KafkaService kafkaService;
 
-	Function<org.springframework.messaging.Message<Mail>, Void> mailListener = kafkaMessage -> {
+	Function<org.springframework.messaging.Message<Mail>, Mono<Void>> mailListener = kafkaMessage -> {
 		Mail payload = kafkaMessage.getPayload();
 		MessageHeaders headers = kafkaMessage.getHeaders();
 		kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
@@ -50,7 +51,7 @@ public class ReactorConsumer {
 		return null;
 	};
 
-	Function<org.springframework.messaging.Message<Message>, Void> messageListener = kafkaMessage -> {
+	Function<org.springframework.messaging.Message<Message>, Mono<Void>> messageListener = kafkaMessage -> {
 		Message payload = kafkaMessage.getPayload();
 		MessageHeaders headers = kafkaMessage.getHeaders();
 		kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
@@ -62,7 +63,7 @@ public class ReactorConsumer {
 		return null;
 	};
 
-	Function<org.springframework.messaging.Message<Mms>, Void> mmsListener = kafkaMessage -> {
+	Function<org.springframework.messaging.Message<Mms>, Mono<Void>> mmsListener = kafkaMessage -> {
 		Mms payload = kafkaMessage.getPayload();
 		MessageHeaders headers = kafkaMessage.getHeaders();
 		kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
@@ -74,7 +75,7 @@ public class ReactorConsumer {
 		return null;
 	};
 
-	Function<org.springframework.messaging.Message<Sms>, Void> smsListener = kafkaMessage -> {
+	Function<org.springframework.messaging.Message<Sms>, Mono<Void>> smsListener = kafkaMessage -> {
 		Sms payload = kafkaMessage.getPayload();
 		MessageHeaders headers = kafkaMessage.getHeaders();
 		kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());

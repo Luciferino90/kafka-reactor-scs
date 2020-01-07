@@ -18,7 +18,7 @@ import java.util.UUID;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
-public class ReactiveKafkaConfiguration {
+public class ReactorKafkaConfiguration {
 
 	@Getter
 	private String topicName;
@@ -29,11 +29,15 @@ public class ReactiveKafkaConfiguration {
 	@Getter
 	private KafkaSender<byte[], byte[]> producer;
 
-	public ReactiveKafkaConfiguration(ReactiveKafkaProperties reactiveKafkaProperties, String labelTopicName){
+	public ReactorKafkaConfiguration(ReactorKafkaProperties reactiveKafkaProperties, String labelTopicName){
 		labelName = labelTopicName;
 		topicName = reactiveKafkaProperties.getBindingServiceProperties().getBindingDestination(labelName);
-		consumer = new ConsumerConfiguration(reactiveKafkaProperties.getKafkaProperties(), reactiveKafkaProperties.getBindingServiceProperties().getBindingProperties(labelName)).builder();
-		producer = new ProducerConfiguration(reactiveKafkaProperties.getKafkaProperties(), reactiveKafkaProperties.getBindingServiceProperties().getBindingProperties(labelName)).builder();
+		reactiveKafkaProperties.getBindingServiceProperties().getBindings().entrySet().stream().filter(b -> labelName.equalsIgnoreCase(b.getKey()) && b.getValue().getConsumer() != null).map(
+				Map.Entry::getValue).findFirst()
+				.ifPresent(e -> consumer = new ConsumerConfiguration(reactiveKafkaProperties.getKafkaProperties(), e).builder());
+		reactiveKafkaProperties.getBindingServiceProperties().getBindings().entrySet().stream().filter(b -> labelName.equalsIgnoreCase(b.getKey()) && b.getValue().getProducer() != null).map(
+				Map.Entry::getValue).findFirst()
+				.ifPresent(e -> producer = new ProducerConfiguration(reactiveKafkaProperties.getKafkaProperties(), e).builder());
 	}
 
 	static class ConsumerConfiguration {
@@ -48,7 +52,6 @@ public class ReactiveKafkaConfiguration {
 		public ConsumerConfiguration(KafkaProperties kafkaProperties, BindingProperties bindingProperties){
 			this.kafkaProperties = kafkaProperties;
 			this.bindingProperties = bindingProperties;
-
 		}
 
 		private Map<String, Object> kafkaConsumerConfiguration() {
@@ -61,8 +64,6 @@ public class ReactiveKafkaConfiguration {
 					ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1",
 					ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RangeAssignor",
 					ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false"
-					//ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true",
-					//ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100"
 			);
 		}
 

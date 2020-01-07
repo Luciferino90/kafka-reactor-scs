@@ -5,14 +5,14 @@ import it.usuratonkachi.kafka.dto.Mail;
 import it.usuratonkachi.kafka.dto.Message;
 import it.usuratonkachi.kafka.dto.Mms;
 import it.usuratonkachi.kafka.dto.Sms;
-import it.usuratonkachi.kafka.reactor.config.ReactiveStreamDispatcher;
+import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
-import reactor.kafka.sender.SenderResult;
 
 import java.time.Duration;
 import java.util.Map;
@@ -32,10 +32,10 @@ public class ReactorProducer implements CommandLineRunner {
 	@Value("${default.waittime:1000}")
 	private Long waittime;
 
-	private final ReactiveStreamDispatcher<Mail> mailDispatcher;
-	private final ReactiveStreamDispatcher<Message> messageDispatcher;
-	private final ReactiveStreamDispatcher<Mms> mmsDispatcher;
-	private final ReactiveStreamDispatcher<Sms> smsDispatcher;
+	private final ReactorStreamDispatcher<Mail> mailDispatcher;
+	private final ReactorStreamDispatcher<Message> messageDispatcher;
+	private final ReactorStreamDispatcher<Mms> mmsDispatcher;
+	private final ReactorStreamDispatcher<Sms> smsDispatcher;
 
 	private final KafkaService kafkaService;
 
@@ -48,7 +48,7 @@ public class ReactorProducer implements CommandLineRunner {
 
 	AtomicInteger base = new AtomicInteger(0);
 
-	private Flux<SenderResult<Object>> sendMail(Integer count, Integer baseCount){
+	private Flux<Disposable> sendMail(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -64,10 +64,10 @@ public class ReactorProducer implements CommandLineRunner {
 						.build()
 				)
 				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.flatMap(mailDispatcher::send);
+				.map(mailDispatcher::send);
 	}
 
-	private Flux<SenderResult<Object>> sendMessage(Integer count, Integer baseCount){
+	private Flux<Disposable> sendMessage(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -83,10 +83,10 @@ public class ReactorProducer implements CommandLineRunner {
 						.build()
 				)
 				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.flatMap(messageDispatcher::send);
+				.map(messageDispatcher::send);
 	}
 
-	private Flux<SenderResult<Object>> sendMms(Integer count, Integer baseCount){
+	private Flux<Disposable> sendMms(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -102,10 +102,10 @@ public class ReactorProducer implements CommandLineRunner {
 						.build()
 				)
 				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.flatMap(mmsDispatcher::send);
+				.map(mmsDispatcher::send);
 	}
 
-	private Flux<SenderResult<Object>> sendSms(Integer count, Integer baseCount){
+	private Flux<Disposable> sendSms(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -121,7 +121,7 @@ public class ReactorProducer implements CommandLineRunner {
 						.build()
 				)
 				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.flatMap(smsDispatcher::send);
+				.map(smsDispatcher::send);
 	}
 
 	public void runLimited() {

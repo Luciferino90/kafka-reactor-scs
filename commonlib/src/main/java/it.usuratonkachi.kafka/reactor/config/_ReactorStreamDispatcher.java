@@ -27,15 +27,15 @@ import java.util.stream.StreamSupport;
 
 @Slf4j
 @Deprecated // Use ByteArray version
-public class _ReactiveStreamDispatcher<T> {
+public class _ReactorStreamDispatcher<T> {
 
-	private final _ReactiveKafkaConfiguration<T> reactiveKafkaConfiguration;
+	private final _ReactorKafkaConfiguration<T> reactiveKafkaConfiguration;
 
-	public _ReactiveStreamDispatcher(ReactiveKafkaProperties reactiveKafkaProperties, String labelTopicName) {
-		this.reactiveKafkaConfiguration = new _ReactiveKafkaConfiguration<>(reactiveKafkaProperties, labelTopicName);
+	public _ReactorStreamDispatcher(ReactorKafkaProperties reactorKafkaProperties, String labelTopicName) {
+		this.reactiveKafkaConfiguration = new _ReactorKafkaConfiguration<>(reactorKafkaProperties, labelTopicName);
 	}
 
-	public _ReactiveStreamDispatcher(_ReactiveKafkaConfiguration<T> reactiveKafkaConfiguration) {
+	public _ReactorStreamDispatcher(_ReactorKafkaConfiguration<T> reactiveKafkaConfiguration) {
 		this.reactiveKafkaConfiguration = reactiveKafkaConfiguration;
 	}
 

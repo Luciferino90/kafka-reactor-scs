@@ -4,9 +4,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ReactiveKafkaConfigurator {
+public class ReactorKafkaConfigurator {
 
 	@Autowired
-	protected ReactiveKafkaProperties reactiveKafkaProperties;
+	protected ReactorKafkaProperties reactorKafkaProperties;
 
 }
