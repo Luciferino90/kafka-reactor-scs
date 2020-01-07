@@ -32,36 +32,48 @@ public class ReactorStreamDispatcher<T> {
 	private final ReactorKafkaConfiguration reactiveKafkaConfiguration;
 
 	private Class<T> clazz;
+	private ObjectMapper objectMapper;
 
 	public ReactorStreamDispatcher(
 			Class<T> clazz, ReactorKafkaProperties reactiveKafkaProperties, String labelTopicName){
 		this.clazz = clazz;
+		this.objectMapper = reactiveKafkaProperties.getObjectMapper();
 		this.reactiveKafkaConfiguration = new ReactorKafkaConfiguration(reactiveKafkaProperties, labelTopicName);
 	}
 
 	public void listen(Function<Message<T>, Mono<Void>> function) {
-		if (reactiveKafkaConfiguration.getConsumer() != null)
+		if (reactiveKafkaConfiguration.getConsumer() != null) {
+			Integer concurrency = reactiveKafkaConfiguration.getConcurrency();
 			reactiveKafkaConfiguration.getConsumer().receive()
 					.groupBy(r -> r.receiverOffset().topicPartition())
-					.flatMap(e -> e.buffer(1))
-					.flatMap(receiverRecords -> {
-						ReceiverRecord<byte[], byte[]> r = receiverRecords.get(0);
-						try {
-							Message<T> message = receiverRecordToMessage(r);
-							return function.apply(message)
-									.doOnNext(e -> {
-										r.receiverOffset().acknowledge();
-										r.receiverOffset().commit();
-									});
-							// TODO In case of businessException should acknowledge and commit.
-						} catch (Exception ex) {
-							log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
-						}
-						return Mono.empty();
-					})
+					.concatMap(e -> e.buffer(concurrency)
+							.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
+								.flatMap(receiverRecord -> listen(function, receiverRecord))
+							)
+					)
 					.subscribe();
-		else
-			throw new RuntimeException("No consumer options for topic with label "+ reactiveKafkaConfiguration.getTopicName() + " configured!");
+		} else {
+			throw new RuntimeException(
+					"No consumer options for topic with label " + reactiveKafkaConfiguration.getTopicName() + " configured!");
+		}
+	}
+
+	private Mono<Void> listen(Function<Message<T>, Mono<Void>> function, ReceiverRecord<byte[], byte[]> receiverRecord){
+		try {
+			return function.apply(receiverRecordToMessage(receiverRecord))
+					.switchIfEmpty(Mono.defer(() -> {
+						receiverRecord.receiverOffset().acknowledge();
+						receiverRecord.receiverOffset().commit();
+						return Mono.empty();
+					}))
+					.doOnError(RuntimeException.class, e -> {
+						receiverRecord.receiverOffset().acknowledge();
+						receiverRecord.receiverOffset().commit();
+					});
+		} catch (Exception ex) {
+			log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+		}
+		return Mono.empty();
 	}
 
 	public Disposable send(Message<T> message){
@@ -85,7 +97,6 @@ public class ReactorStreamDispatcher<T> {
 	}
 
 	private ProducerRecord<byte[], byte[]> messageToProducerRecord(Message<T> message){
-		ObjectMapper objectMapper = new ObjectMapper();
 		try {
 			byte[] payload = objectMapper.writeValueAsBytes(message.getPayload());
 			Iterable<Header> headers = headersToProducerRecordHeaders(message);
@@ -96,7 +107,6 @@ public class ReactorStreamDispatcher<T> {
 	}
 
 	private Iterable<Header> headersToProducerRecordHeaders(Message<T> message){
-		ObjectMapper objectMapper = new ObjectMapper();
 		return message.getHeaders().entrySet().stream()
 				.filter(entryHeader -> entryHeader.getValue() instanceof Serializable)
 				.map(entryHeader -> {
@@ -140,7 +150,6 @@ public class ReactorStreamDispatcher<T> {
 
 	@SuppressWarnings("unchecked")
 	private T deserializeObject(byte[] serialized, Class<T> clazz){
-		ObjectMapper objectMapper = new ObjectMapper();
 		try {
 			Map<String, Object> content = objectMapper.readValue(serialized, Map.class);
 			if (content != null && content.containsKey("payload"))
@@ -156,11 +165,7 @@ public class ReactorStreamDispatcher<T> {
 
 	private Map<String, Object> receiverRecordToHeaders(ReceiverRecord<byte[], byte[]> receiverRecord){
 		return StreamSupport.stream(receiverRecord.headers().spliterator(), false)
-				.map(header -> {
-					//Object headerValue = new String(header.value());
-					//return Tuples.of(header.key(), headerValue);
-					return Tuples.of(header.key(), header.value());
-				})
+				.map(header -> Tuples.of(header.key(), header.value()))
 				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
 	}
 

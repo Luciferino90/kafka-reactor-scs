@@ -29,54 +29,50 @@ public class SCSConsumer {
 	private final KafkaService kafkaService;
 
 	//@Value("${default.waittime:1000}")
-	private Long waittime = 0L;
-
-	private void waitSleep(){
-		try {
-			Thread.sleep(waittime);
-		} catch (InterruptedException ex) {
-			ex.printStackTrace();
-		}
-	}
+	private Long waittime = 1000L;
 
 	@StreamListener(Streams.MAIL_CHANNEL_INPUT)
 	public void onMail(@Payload Mail msg, @Headers Map<String, Object> headers) {
 		final Mono<Mail> mono = Mono.just(msg)
-				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
-				//.doOnNext(e -> waitSleep())
+				.doOnNext(e -> System.out.println("Start: " + msg.getMsgNum()))
+				//.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
 				.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
+				.doOnNext(e -> System.out.println("Ending: " + msg.getMsgNum()))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
-		mono.block();
+		mono.subscribe();
 	}
 
 	@StreamListener(Streams.MESSAGE_CHANNEL_INPUT)
 	public void onMessage(@Payload Message msg, @Headers Map<String, Object> headers) {
 		final Mono<Message> mono = Mono.just(msg)
-				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
-				.doOnNext(e -> waitSleep())
-				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
+				.doOnNext(e -> System.out.println("Start: " + msg.getMsgNum()))
+				//.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
+				.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
+				.doOnNext(e -> System.out.println("Ending: " + msg.getMsgNum()))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
-		mono.block();
+		mono.subscribe();
 	}
 
 	@StreamListener(Streams.MMS_CHANNEL_INPUT)
 	public void onMms(@Payload Mms msg, @Headers Map<String, Object> headers) {
 		final Mono<Mms> mono = Mono.just(msg)
-				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
-				.doOnNext(e -> waitSleep())
-				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
+				.doOnNext(e -> System.out.println("Start: " + msg.getMsgNum()))
+				//.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
+				.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
+				.doOnNext(e -> System.out.println("Ending: " + msg.getMsgNum()))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
-		mono.block();
+		mono.subscribe();
 	}
 
 	@StreamListener(Streams.SMS_CHANNEL_INPUT)
 	public void onSms(@Payload Sms msg, @Headers Map<String, Object> headers) {
 		final Mono<Sms> mono = Mono.just(msg)
-				.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
-				.doOnNext(e -> waitSleep())
-				.delayElement(Duration.of(waittime, ChronoUnit.SECONDS))
+				.doOnNext(e -> System.out.println("Start: " + msg.getMsgNum()))
+				//.doOnNext(e -> kafkaService.ackIfNotYetLogOtherwise(msg.getMsgNum(), msg.getProducer(), msg.getClass().getSimpleName()))
+				.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
+				.doOnNext(e -> System.out.println("Ending: " + msg.getMsgNum()))
 				.flatMap(x -> Mono.defer(() -> Mono.just(msg)));
-		mono.block();
+		mono.subscribe();
 	}
 
 }
