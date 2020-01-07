@@ -43,12 +43,15 @@ public class ReactiveStreamDispatcher<T> {
 	public void listen(Function<Message<T>, Void> function) {
 		if (reactiveKafkaConfiguration.getConsumer() != null)
 			reactiveKafkaConfiguration.getConsumer().receive()
-					.doOnNext(r -> {
+					.groupBy(r -> r.receiverOffset().topicPartition())
+					.flatMap(e -> e.buffer(1))
+					.doOnNext(receiverRecords -> {
+						ReceiverRecord<byte[], byte[]> r = receiverRecords.get(0);
 						try {
-							r.receiverOffset().acknowledge();
-							r.receiverOffset().commit();
 							Message<T> message = receiverRecordToMessage(r);
 							function.apply(message);
+							r.receiverOffset().acknowledge();
+							r.receiverOffset().commit();
 							// TODO In case of businessException should acknowledge and commit.
 						} catch (Exception ex) {
 							log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);

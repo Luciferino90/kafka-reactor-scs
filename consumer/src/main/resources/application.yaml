@@ -112,7 +112,6 @@ defaut:
 logging:
   level:
     root: INFO
-    it: ERROR
 ---
 spring:
   profiles: 1
