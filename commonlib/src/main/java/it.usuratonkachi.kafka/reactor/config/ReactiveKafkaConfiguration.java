@@ -61,6 +61,8 @@ public class ReactiveKafkaConfiguration {
 					ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1",
 					ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RangeAssignor",
 					ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false"
+					//ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true",
+					//ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100"
 			);
 		}
 

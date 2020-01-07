@@ -10,3 +10,9 @@ TBD
 
 
 ConsumerCoordinator.refreshCommittedOffsetsIfNeeded for reactive part doesn't work
+
+====
+
+Query
+select ackedby, msgtype, count(*) from kafkacheck.kafka group by ackedby, msgtype order by msgtype, ackedby;
+select ackreceived, msgtype, count(*) from kafkacheck.kafka group by ackreceived, msgtype;
