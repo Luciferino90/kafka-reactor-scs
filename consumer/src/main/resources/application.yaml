@@ -70,7 +70,7 @@ spring:
           contentType: application/json
           consumer:
             auto-commit-offset: true
-            concurrency: 3
+            concurrency: 1
             max-attempts: 3
             partitioned: true
         message-kafka-in: # consumer

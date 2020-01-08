@@ -26,38 +26,91 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+/**
+ * Classe che di occupa di leggere e inviare messaggi verso kafka.
+ * Potenzialmente un solo bean può essere configurato sia come consumer che come producer.
+ *
+ * @param <T> Tipo di messaggio che si invia e si riceve attraverso questo topic
+ */
 @Slf4j
 public class ReactorStreamDispatcher<T> {
 
-	private final ReactorKafkaConfiguration reactiveKafkaConfiguration;
+	private final ReactorKafkaConfiguration reactorKafkaConfiguration;
 
 	private Class<T> clazz;
 	private ObjectMapper objectMapper;
+	private boolean alreadyStarted = false;
 
-	public ReactorStreamDispatcher(
-			Class<T> clazz, ReactorKafkaProperties reactiveKafkaProperties, String labelTopicName){
+	/**
+	 * Costruttore del dispatcher
+	 * @param clazz
+	 * 		classe del tipo di messaggio in invio e ricezione
+	 * @param reactiveKafkaProperties
+	 * 		properties autoconfiguranti provenienti da Spring Cloud Stream
+	 * @param labelTopicName
+	 * 		label del topic da configurare. Viene matchato con il `channel` di spring.cloud.stream.bindings.channel
+	 * 		e spring.cloud.stream.kafka.bindings.channel per recuperare le properties da configurare
+	 */
+	public ReactorStreamDispatcher(Class<T> clazz, ReactorKafkaProperties reactiveKafkaProperties, String labelTopicName){
 		this.clazz = clazz;
 		this.objectMapper = reactiveKafkaProperties.getObjectMapper();
-		this.reactiveKafkaConfiguration = new ReactorKafkaConfiguration(reactiveKafkaProperties, labelTopicName);
+		this.reactorKafkaConfiguration = new ReactorKafkaConfiguration(reactiveKafkaProperties, labelTopicName);
 	}
 
+	/**
+	 * Metodo di ascolto del listener. Si registra una sola volta a causa della doppia lettura delle classi da parte di spring
+	 * (Component e Component$Proxy).
+	 *
+	 * Supporta la parallelizzazione dei messaggi tramite la property
+	 * spring.cloud.stream.kafka.bindings.channel.consumer.configuration.concurrency
+	 *
+	 * L'ordinamento per partizione migliora la stabilità della lettura dei messaggi, riducendo eventuali gestioni multiple.
+	 *
+	 * @param function
+	 * 		function da eseguire su ciascun messaggio
+	 */
 	public void listen(Function<Message<T>, Mono<Void>> function) {
-		if (reactiveKafkaConfiguration.getConsumer() != null) {
-			Integer concurrency = reactiveKafkaConfiguration.getConcurrency();
-			reactiveKafkaConfiguration.getConsumer().receive()
+		if (alreadyStarted) return;
+		else alreadyStarted = true;
+		ReactorKafkaConfiguration.ConsumerConfiguration consumer = reactorKafkaConfiguration.getConsumer();
+		if (reactorKafkaConfiguration.getConsumer() != null) {
+			Integer concurrency = reactorKafkaConfiguration.getConcurrency();
+			reactorKafkaConfiguration.getConsumer().getReceiver().receive()
+					//.concatMap(receiverRecord -> listen(function, receiverRecord))
 					.groupBy(r -> r.receiverOffset().topicPartition())
+					.filter(r -> r.key() != null && consumer.getNotRevokedPartition().contains(r.key().toString()))
+						.switchIfEmpty(Mono.defer(() -> {
+							log.warn("Scartata Partition revocata!");
+							return Mono.empty();
+						}))
 					.concatMap(e -> e.buffer(concurrency)
 							.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
-								.flatMap(receiverRecord -> listen(function, receiverRecord))
+									.flatMap(receiverRecord -> listen(function, receiverRecord))
 							)
 					)
 					.subscribe();
 		} else {
 			throw new RuntimeException(
-					"No consumer options for topic with label " + reactiveKafkaConfiguration.getTopicName() + " configured!");
+					"No consumer options for topic with label " + reactorKafkaConfiguration.getTopicName() + " configured!");
 		}
 	}
 
+	/**
+	 * Metodo che si occupa di gestire il singolo messaggio eseguendo la function passata da chi utilizza la libreria.
+	 *
+	 *  Per poter gestire l'ack e il commit dei messaggi ci si aspetta che il consumer torni alla libreria una qualche forma
+	 * di informazione, per il momento si è optato per un Mono.empty.
+	 *
+	 * Di default tutte le eccezioni diverse da BusinessException riportano l'errore a Kafka che ritrasmette il messaggio.
+	 *
+	 * Le business exception invece committano l'ack.
+	 *
+	 * @param function
+	 * 		function da gestire sul messaggio
+	 * @param receiverRecord
+	 * 		messaggio letto dal topic
+	 * @return
+	 */
 	private Mono<Void> listen(Function<Message<T>, Mono<Void>> function, ReceiverRecord<byte[], byte[]> receiverRecord){
 		try {
 			return function.apply(receiverRecordToMessage(receiverRecord))
@@ -76,36 +129,64 @@ public class ReactorStreamDispatcher<T> {
 		return Mono.empty();
 	}
 
+	/**
+	 * Wrapper invio messaggi da richiamare nei progetti
+	 * @param message
+	 * @return
+	 */
 	public Disposable send(Message<T> message){
 		return sendAsync(message).subscribe();
 	}
 
+	/**
+	 * Invio asincrono dei messaggi
+	 * @param message
+	 * @return
+	 */
 	private Flux<SenderResult<Object>> sendAsync(Message<T> message) {
-		if (reactiveKafkaConfiguration.getProducer() != null) {
+		if (reactorKafkaConfiguration.getProducer() != null) {
 			return internalSend(message);
 		} else {
 			throw new RuntimeException(
-					"No producer options for topic with label " + reactiveKafkaConfiguration.getTopicName() + " configured!");
+					"No producer options for topic with label " + reactorKafkaConfiguration.getTopicName() + " configured!");
 		}
 	}
 
+	/**
+	 * Converte il messaggio in byte e lo invia verso il topic kafka.
+	 * La libreria supporta invii molteplici tramite flux, cosa che nel nostro caso non è richiesta, gestiamo solamente
+	 * l'invio dei singoli messaggi.
+	 *
+	 * @param message
+	 * @return
+	 */
 	private Flux<SenderResult<Object>> internalSend(Message<T> message){
 		ProducerRecord<byte[], byte[]> producer = messageToProducerRecord(message);
 		SenderRecord<byte[], byte[], Object> senderRecord = SenderRecord.create(producer, null);
 		Flux<SenderRecord<byte[], byte[], Object>> messageSource = Flux.from(Mono.defer(() -> Mono.just(senderRecord)));
-		return reactiveKafkaConfiguration.getProducer().send(messageSource);
+		return reactorKafkaConfiguration.getProducer().send(messageSource);
 	}
 
+	/**
+	 * Metodo per convertire i message in ProducerRecord.
+	 * @param message
+	 * @return
+	 */
 	private ProducerRecord<byte[], byte[]> messageToProducerRecord(Message<T> message){
 		try {
 			byte[] payload = objectMapper.writeValueAsBytes(message.getPayload());
 			Iterable<Header> headers = headersToProducerRecordHeaders(message);
-			return new ProducerRecord<>(reactiveKafkaConfiguration.getTopicName(), null, null, null, payload, headers);
+			return new ProducerRecord<>(reactorKafkaConfiguration.getTopicName(), null, null, null, payload, headers);
 		} catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
+	/**
+	 * Metodo che converte gli header di un message in RecordHeader
+	 * @param message
+	 * @return
+	 */
 	private Iterable<Header> headersToProducerRecordHeaders(Message<T> message){
 		return message.getHeaders().entrySet().stream()
 				.filter(entryHeader -> entryHeader.getValue() instanceof Serializable)
@@ -123,12 +204,22 @@ public class ReactorStreamDispatcher<T> {
 				.collect(Collectors.toList());
 	}
 
+	/**
+	 * Metodo che deserializza un messaggio in byte array in un Message del tipo configurato nel dispatcher.
+	 * @param receiverRecord
+	 * @return
+	 */
 	private Message<T> receiverRecordToMessage(ReceiverRecord<byte[], byte[]> receiverRecord) {
 		Map<String, Object> headersMap = receiverRecordToHeaders(receiverRecord);
 		MessageHeaders headers = new MessageHeaders(headersMap);
 		return receiverRecordToMessage(receiverRecord, headers);
 	}
 
+	/**
+	 * Metodo che deserializza un messaggio in byte array in un Message del tipo configurato nel dispatcher.
+	 * @param receiverRecord
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	private Message<T> receiverRecordToMessage(ReceiverRecord<byte[], byte[]> receiverRecord, MessageHeaders messageHeaders) {
 		T deserializedValue = null;
@@ -143,6 +234,16 @@ public class ReactorStreamDispatcher<T> {
 		return new GenericMessage<>(deserializedValue, messageHeaders);
 	}
 
+	/**
+	 * Metodo che deserializza gli header in byte array in una mappa.
+	 * @param receiverRecord
+	 * @return
+	 */
+	private Map<String, Object> receiverRecordToHeaders(ReceiverRecord<byte[], byte[]> receiverRecord){
+		return StreamSupport.stream(receiverRecord.headers().spliterator(), false)
+				.map(header -> Tuples.of(header.key(), header.value()))
+				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
+	}
 
 	private T deserializeObject(byte[] serialized){
 		return deserializeObject(serialized, clazz);
@@ -161,12 +262,6 @@ public class ReactorStreamDispatcher<T> {
 			log.error(errorMessage, ex);
 			throw new RuntimeException(errorMessage, ex);
 		}
-	}
-
-	private Map<String, Object> receiverRecordToHeaders(ReceiverRecord<byte[], byte[]> receiverRecord){
-		return StreamSupport.stream(receiverRecord.headers().spliterator(), false)
-				.map(header -> Tuples.of(header.key(), header.value()))
-				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
 	}
 
 	public static <T> Collector<T, ?, T> toSingleton() {

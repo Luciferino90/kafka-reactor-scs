@@ -51,7 +51,7 @@ spring:
           contentType: application/json
           producer:
             #partition-key-expression: T(java.util.UUID).randomUUID().toString()
-            partition-count: 1
+            partition-count: 10
         message-kafka-out: # producer
           group: ${spring.application.name}
           destination: message-kafka-topic # nome della coda di kafka. If not set, the channel name is used instead.

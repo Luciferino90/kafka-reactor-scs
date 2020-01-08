@@ -12,16 +12,17 @@ import org.springframework.cloud.stream.binder.kafka.properties.KafkaProducerPro
 import org.springframework.cloud.stream.config.BindingProperties;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
+import reactor.kafka.receiver.internals.DefaultKafkaReceiver;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderOptions;
 
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collector;
+import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Classe di configurazione per i dispatcher di reactor-kafka.
+ * Converte l'autoconfigurazione di Spring Cloud Stream in un'autoconfigurazione per reactor-kafka.
+ */
 public class ReactorKafkaConfiguration {
 
 	@Getter
@@ -29,62 +30,74 @@ public class ReactorKafkaConfiguration {
 	@Getter
 	private String labelName;
 	@Getter
-	private KafkaReceiver<byte[], byte[]> consumer;
+	private ConsumerConfiguration consumer;
+	@Getter
+	private List<String> assignedPartition;
 	@Getter
 	private KafkaSender<byte[], byte[]> producer;
 	@Getter
 	private Integer concurrency = 1;
 
-	public ReactorKafkaConfiguration(ReactorKafkaProperties reactiveKafkaProperties, String labelTopicName){
+	public ReactorKafkaConfiguration(ReactorKafkaProperties reactorKafkaProperties, String labelTopicName){
 		labelName = labelTopicName;
-		topicName = reactiveKafkaProperties.getBindingServiceProperties().getBindingDestination(labelName);
+		topicName = reactorKafkaProperties.getBindingServiceProperties().getBindingDestination(labelName);
 
-		String port = reactiveKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers()[reactiveKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers().length - 1].split(":")[1];
-		String hosts = Arrays.stream(reactiveKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers()).map(host -> host.split(":")[0] + ":" + port).collect(
-				Collectors.joining(","));
+		String port = reactorKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers()[reactorKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers().length - 1].split(":")[1];
+		String hosts = Arrays.stream(reactorKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers()).map(host -> host.split(":")[0] + ":" + port).collect(Collectors.joining(","));
 
-		Optional<BindingProperties> bindingPropertiesConsumer = reactiveKafkaProperties.getBindingServiceProperties().getBindings().entrySet().stream().filter(b -> labelName.equalsIgnoreCase(b.getKey()) && b.getValue().getConsumer() != null).map(
-				Map.Entry::getValue).findFirst();
+		Optional<BindingProperties> bindingPropertiesConsumer = reactorKafkaProperties.getBindingServiceProperties()
+				.getBindings()
+				.entrySet()
+				.stream()
+				.filter(b -> labelName.equalsIgnoreCase(b.getKey()) && b.getValue().getConsumer() != null)
+				.map(Map.Entry::getValue)
+				.findFirst();
 
 		bindingPropertiesConsumer
 				.ifPresent(bindingProperties -> concurrency = bindingProperties.getConsumer().getConcurrency());
 
-		Optional<BindingProperties> bindingPropertiesProducer = reactiveKafkaProperties.getBindingServiceProperties().getBindings().entrySet().stream().filter(b -> labelName.equalsIgnoreCase(b.getKey()) && b.getValue().getProducer() != null).map(
-				Map.Entry::getValue).findFirst();
+		Optional<BindingProperties> bindingPropertiesProducer = reactorKafkaProperties.getBindingServiceProperties()
+				.getBindings()
+				.entrySet()
+				.stream()
+				.filter(b -> labelName.equalsIgnoreCase(b.getKey()) && b.getValue().getProducer() != null)
+				.map(Map.Entry::getValue)
+				.findFirst();
 
 		bindingPropertiesConsumer.ifPresent(bindingProperties -> {
-			ConsumerConfiguration c = new ConsumerConfiguration(
-					reactiveKafkaProperties.getKafkaExtendedBindingProperties().getBindings().get(labelName).getConsumer(),
-					bindingPropertiesConsumer.get(),
-					reactiveKafkaProperties.getBindingServiceProperties().getBindings().get(labelName).getConsumer(),
-					hosts,
-					reactiveKafkaProperties.getApplicationName()
-			);
-			consumer = c.builder();
+			consumer = new ConsumerConfiguration(
+					reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings().get(labelName)
+							.getConsumer(), bindingPropertiesConsumer.get(),
+					reactorKafkaProperties.getBindingServiceProperties().getBindings().get(labelName).getConsumer(),
+					hosts, reactorKafkaProperties.getApplicationName());
+			consumer.builder();
 		});
 
 
 		bindingPropertiesProducer.ifPresent(bindingProperties -> {
 			ProducerConfiguration p = new ProducerConfiguration(
 					null, //reactiveKafkaProperties.getKafkaExtendedBindingProperties().getBindings().get(labelName).getProducer(),
-					reactiveKafkaProperties.getBindingServiceProperties().getBindings().get(labelName).getProducer(),
+					reactorKafkaProperties.getBindingServiceProperties().getBindings().get(labelName).getProducer(),
 					hosts
 			);
 			producer = p.builder();
 		});
-
 	}
 
-	static class ConsumerConfiguration {
+	public static class ConsumerConfiguration {
 
 		private final KafkaConsumerProperties kafkaConsumerProperties;
 		private final BindingProperties bindingProperties;
 		private final ConsumerProperties consumerProperties;
 		private final String hosts;
 		private final String group;
+		@Getter
+		private List<String> notRevokedPartition;
+		@Getter
+		private KafkaReceiver<byte[], byte[]> receiver;
 
-		public KafkaReceiver<byte[], byte[]> builder(){
-			return reactiveKafkaReceiver();
+		public void builder(){
+			receiver = reactiveKafkaReceiver();
 		}
 
 		public ConsumerConfiguration(
@@ -102,7 +115,7 @@ public class ReactorKafkaConfiguration {
 					ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
 					ConsumerConfig.GROUP_ID_CONFIG, group,
 					ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, hosts,
-					ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "900000",
+					ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "60000",
 					ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1",
 					ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RangeAssignor",
 					ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false"
@@ -111,10 +124,16 @@ public class ReactorKafkaConfiguration {
 
 		private ReceiverOptions<byte[], byte[]> kafkaReceiverOptions() {
 			ReceiverOptions<byte[], byte[]> options = ReceiverOptions.create(kafkaConsumerConfiguration());
-
 			 return options.subscription(Arrays.asList(this.bindingProperties.getDestination()))
 					.withKeyDeserializer(new ByteArrayDeserializer())
-					.withValueDeserializer(new ByteArrayDeserializer());
+					.withValueDeserializer(new ByteArrayDeserializer())
+					 .addAssignListener(receiverPartitions -> {
+					 	notRevokedPartition = receiverPartitions.stream().map(receiverPartition -> receiverPartition.topicPartition().toString()).collect(Collectors.toList());
+					 	System.out.println("");
+					 })
+					 .addRevokeListener(receiverPartitions -> {
+						 System.out.println("");
+					 });
 		}
 
 		private KafkaReceiver<byte[], byte[]> reactiveKafkaReceiver() {
@@ -123,7 +142,7 @@ public class ReactorKafkaConfiguration {
 
 	}
 
-	static class ProducerConfiguration {
+	private static class ProducerConfiguration {
 
 		private final KafkaProducerProperties kafkaProducerProperties;
 		private final ProducerProperties producerProperties;
@@ -157,18 +176,6 @@ public class ReactorKafkaConfiguration {
 			return KafkaSender.create(kafkaSenderOptions());
 		}
 
-	}
-
-	public static <T> Collector<T, ?, T> toSingleton() {
-		return Collectors.collectingAndThen(
-				Collectors.toList(),
-				list -> {
-					if (list.size() != 1) {
-						throw new RuntimeException("More than one result");
-					}
-					return list.get(0);
-				}
-		);
 	}
 
 }

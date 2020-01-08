@@ -11,6 +11,9 @@ import org.springframework.cloud.stream.binder.kafka.properties.KafkaExtendedBin
 import org.springframework.cloud.stream.config.BindingServiceProperties;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Wrapper dei bean necessari alla configurazione di reactor-kafka
+ */
 @Configuration
 @RequiredArgsConstructor
 @EnableConfigurationProperties(value = { KafkaBinderConfigurationProperties.class, KafkaExtendedBindingProperties.class, KafkaProperties.class, BindingServiceProperties.class })
@@ -25,8 +28,6 @@ public class ReactorKafkaProperties {
 	private final KafkaBinderConfigurationProperties kafkaBinderConfigurationProperties; // kafka scs
 	@Getter
 	private final KafkaExtendedBindingProperties kafkaExtendedBindingProperties; // kafka scs
-	@Getter
-	private final KafkaProperties kafkaProperties; // kafka - not used
 	@Getter
 	private final BindingServiceProperties bindingServiceProperties; // commons scs
 
