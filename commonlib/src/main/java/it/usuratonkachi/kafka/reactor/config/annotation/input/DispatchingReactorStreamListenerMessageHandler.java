@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package it.usuratonkachi.kafka.reactor.config.annotation;
+package it.usuratonkachi.kafka.reactor.config.annotation.input;
 
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;

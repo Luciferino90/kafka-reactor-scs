@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package it.usuratonkachi.kafka.reactor.config.annotation;
+package it.usuratonkachi.kafka.reactor.config.annotation.input;
 
 import org.springframework.integration.handler.AbstractReplyProducingMessageHandler;
 import org.springframework.messaging.Message;

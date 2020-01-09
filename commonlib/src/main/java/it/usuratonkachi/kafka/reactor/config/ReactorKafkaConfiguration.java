@@ -31,7 +31,8 @@ public class ReactorKafkaConfiguration {
 		topicName = reactorKafkaProperties.getBindingServiceProperties().getBindingDestination(labelName);
 
 		String port = reactorKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers()[reactorKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers().length - 1].split(":")[1];
-		String hosts = Arrays.stream(reactorKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers()).map(host -> host.split(":")[0] + ":" + port).collect(Collectors.joining(","));
+		String hosts = Arrays.stream(reactorKafkaProperties.getKafkaBinderConfigurationProperties().getBrokers()).map(host -> host.split(":")[0] + ":" + port).collect(
+				Collectors.joining(","));
 
 		Optional<BindingProperties> bindingPropertiesConsumer = reactorKafkaProperties.getBindingServiceProperties()
 				.getBindings()

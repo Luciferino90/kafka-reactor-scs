@@ -5,7 +5,7 @@ import it.usuratonkachi.kafka.dto.Mail;
 import it.usuratonkachi.kafka.dto.Message;
 import it.usuratonkachi.kafka.dto.Mms;
 import it.usuratonkachi.kafka.dto.Sms;
-import it.usuratonkachi.kafka.reactor.config.annotation.ReactorStreamListener;
+import it.usuratonkachi.kafka.reactor.config.annotation.input.ReactorStreamListener;
 import it.usuratonkachi.kafka.reactor.streamconfig.Streams;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

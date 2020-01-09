@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package it.usuratonkachi.kafka.reactor.config.annotation;
+package it.usuratonkachi.kafka.reactor.config.annotation.input;
 
 import org.springframework.cloud.stream.annotation.Input;
 import org.springframework.cloud.stream.annotation.Output;
@@ -72,8 +72,7 @@ public interface ReactorStreamListenerSetupMethodOrchestrator {
 	 * @param bean that contains the ReactorStreamListener method
 	 *
 	 */
-	void orchestrateStreamListenerSetupMethod(ReactorStreamListener ReactorStreamListener,
-                                              Method method, Object bean);
+	void orchestrateStreamListenerSetupMethod(ReactorStreamListener ReactorStreamListener, Method method, Object bean);
 
 	/**
 	 * Default implementation for adapting each of the incoming method arguments using an
@@ -87,8 +86,8 @@ public interface ReactorStreamListenerSetupMethodOrchestrator {
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	default Object[] adaptAndRetrieveInboundArguments(Method method, String inboundName,
-                                                      ApplicationContext applicationContext,
-                                                      StreamListenerParameterAdapter... ReactorStreamListenerParameterAdapters) {
+			ApplicationContext applicationContext,
+			StreamListenerParameterAdapter... ReactorStreamListenerParameterAdapters) {
 		Object[] arguments = new Object[method.getParameterTypes().length];
 		for (int parameterIndex = 0; parameterIndex < arguments.length; parameterIndex++) {
 			MethodParameter methodParameter = MethodParameter.forExecutable(method,

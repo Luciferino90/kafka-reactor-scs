@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package it.usuratonkachi.kafka.reactor.config.annotation;
+package it.usuratonkachi.kafka.reactor.config.annotation.input;
 
 import it.usuratonkachi.kafka.reactor.config.ReactorKafkaProperties;
 import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
@@ -26,7 +26,6 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.beans.factory.SmartInitializingSingleton;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -73,8 +72,8 @@ import java.util.function.Function;
  */
 @Component
 @RequiredArgsConstructor
-public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPostProcessor,
-		ApplicationContextAware, SmartInitializingSingleton {
+public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPostProcessor, ApplicationContextAware,
+		SmartInitializingSingleton {
 
 	@AllArgsConstructor
 	private static class ParamsPosition {
@@ -269,7 +268,8 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		Method[] uniqueDeclaredMethods = ReflectionUtils
 				.getUniqueDeclaredMethods(targetClass);
 		for (Method method : uniqueDeclaredMethods) {
-			ReactorStreamListener streamListener = AnnotatedElementUtils.findMergedAnnotation(method, ReactorStreamListener.class);
+			ReactorStreamListener streamListener = AnnotatedElementUtils
+					.findMergedAnnotation(method, ReactorStreamListener.class);
 			if (streamListener != null && !method.isBridge()) {
 				this.streamListenerPresent = true;
 				this.streamListenerCallbacks.add(() -> {
