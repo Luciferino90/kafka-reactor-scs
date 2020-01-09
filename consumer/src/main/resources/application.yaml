@@ -46,8 +46,8 @@ spring:
           mail-kafka-in:
             consumer:
               configuration:
-                enable.auto.commit: true
-                auto.commit.interval.ms: 0
+                # enable.auto.commit: true
+                # auto.commit.interval.ms: 0
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
                 partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
@@ -55,8 +55,8 @@ spring:
           message-kafka-in:
             consumer:
               configuration:
-                enable.auto.commit: true
-                auto.commit.interval.ms: 0
+                # enable.auto.commit: true
+                # auto.commit.interval.ms: 0
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
                 partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
@@ -64,8 +64,8 @@ spring:
           mms-kafka-in:
             consumer:
               configuration:
-                enable.auto.commit: true
-                auto.commit.interval.ms: 0
+                # enable.auto.commit: true
+                # auto.commit.interval.ms: 0
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
                 partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
@@ -73,8 +73,8 @@ spring:
           sms-kafka-in:
             consumer:
               configuration:
-                enable.auto.commit: true
-                auto.commit.interval.ms: 0
+                # enable.auto.commit: true
+                # auto.commit.interval.ms: 0
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
                 partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
@@ -85,9 +85,9 @@ spring:
           destination: mail-kafka-topic
           contentType: application/json
           consumer:
-            enable.auto.commit: true
-            auto.commit.interval.ms: 0
-            concurrency: 10
+            #enable.auto.commit: true
+            #auto.commit.interval.ms: 0
+            concurrency: 1
             max-attempts: 3
             partitioned: true
         message-kafka-in: # consumer

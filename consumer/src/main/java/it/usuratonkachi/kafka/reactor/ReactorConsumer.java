@@ -29,9 +29,7 @@ public class ReactorConsumer {
 	private String profile;
 
 	//@Value("${default.waittime:10000}")
-	private Long waittime = 1000L;
-
-	private static Boolean started = false;
+	private Long waittime = 0L;
 
 	private final ReactorStreamDispatcher<Mail> mailDispatcher;
 	private final ReactorStreamDispatcher<Message> messageDispatcher;
@@ -96,8 +94,6 @@ public class ReactorConsumer {
 	@EventListener(ApplicationStartedEvent.class)
 	public void onMessages() {
 		// Spring call ApplicationStartedEvent twice, first for the class, second for its proxy.
-		if (started) return;
-		else started = true;
 		mailDispatcher.listen(mailListener);
 		messageDispatcher.listen(messageListener);
 		mmsDispatcher.listen(mmsListener);
