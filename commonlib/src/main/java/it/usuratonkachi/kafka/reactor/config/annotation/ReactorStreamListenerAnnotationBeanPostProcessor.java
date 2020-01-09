@@ -26,6 +26,7 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -75,12 +76,20 @@ import java.util.function.Function;
 public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPostProcessor,
 		ApplicationContextAware, SmartInitializingSingleton {
 
+	@AllArgsConstructor
+	private static class ParamsPosition {
+		@Getter
+		private int payloadPosition;
+		@Getter
+		private int headerPosition;
+	}
+
 	private final ReactorKafkaProperties reactorKafkaProperties;
 
 	private static final SpelExpressionParser SPEL_EXPRESSION_PARSER = new SpelExpressionParser();
 
 	// @checkstyle:off
-	private final MultiValueMap<String, StreamListenerHandlerMethodMapping> mappedListenerMethods = new LinkedMultiValueMap<>();
+	private final MultiValueMap<String, ReactorStreamListenerHandlerMethodMapping> mappedListenerMethods = new LinkedMultiValueMap<>();
 
 	// @checkstyle:on
 
@@ -124,11 +133,11 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		this.injectAndPostProcessDependencies();
 		EvaluationContext evaluationContext = IntegrationContextUtils
 				.getEvaluationContext(this.applicationContext.getBeanFactory());
-		for (Map.Entry<String, List<StreamListenerHandlerMethodMapping>> mappedBindingEntry : this.mappedListenerMethods
+		for (Map.Entry<String, List<ReactorStreamListenerHandlerMethodMapping>> mappedBindingEntry : this.mappedListenerMethods
 				.entrySet()) {
 			ArrayList<DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper> handlers;
 			handlers = new ArrayList<>();
-			for (StreamListenerHandlerMethodMapping mapping : mappedBindingEntry
+			for (ReactorStreamListenerHandlerMethodMapping mapping : mappedBindingEntry
 					.getValue()) {
 				final InvocableHandlerMethod invocableHandlerMethod = this.messageHandlerMethodFactory
 						.createInvocableHandlerMethod(mapping.getTargetBean(),
@@ -184,7 +193,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			this.applicationContext.getBeanFactory().registerSingleton(
 					handler.getClass().getSimpleName() + handler.hashCode(), handler);
 
-			StreamListenerHandlerMethodMapping listener = this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey());
+			ReactorStreamListenerHandlerMethodMapping listener = this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey());
 
 			if (listener == null || listener.getMethod() == null) throw new RuntimeException("Cannot find method " + mappedBindingEntry.getKey());
 
@@ -213,14 +222,6 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		throw new RuntimeException("No Payload annotation found!");
 	}
 
-	@AllArgsConstructor
-	private static class ParamsPosition {
-		@Getter
-		private int payloadPosition;
-		@Getter
-		private int headerPosition;
-	}
-
 	private ParamsPosition getParameterPosition(Annotation[][] annotations){
 		int payloadPosition = -1;
 		int headerPosition = -1;
@@ -245,7 +246,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	private Function<Message<?>, Mono<Void>> getFunctionListener(StreamListenerHandlerMethodMapping listener){
+	private Function<Message<?>, Mono<Void>> getFunctionListener(ReactorStreamListenerHandlerMethodMapping listener){
 		return message -> {
 			try {
 				return (Mono) listener.getMethod().invoke(listener.getTargetBean(), composeVarArgsParams(listener.getMethod(), message));
@@ -405,13 +406,13 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		// Default orchestrator for StreamListener method invocation is added last into
 		// the LinkedHashSet.
 		this.streamListenerSetupMethodOrchestrators.add(
-				new DefaultStreamListenerSetupMethodOrchestrator(this.applicationContext,
+				new DefaultReactorStreamListenerSetupMethodOrchestrator(this.applicationContext,
 						streamListenerParameterAdapters, streamListenerResultAdapters));
 
 		this.streamListenerCallbacks.forEach(Runnable::run);
 	}
 
-	private class StreamListenerHandlerMethodMapping {
+	private class ReactorStreamListenerHandlerMethodMapping {
 
 		private final Object targetBean;
 
@@ -423,7 +424,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 
 		private final String copyHeaders;
 
-		StreamListenerHandlerMethodMapping(Object targetBean, Method method,
+		ReactorStreamListenerHandlerMethodMapping(Object targetBean, Method method,
 				String condition, String defaultOutputChannel, String copyHeaders) {
 			this.targetBean = targetBean;
 			this.method = method;
@@ -455,7 +456,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 	}
 
 	@SuppressWarnings("rawtypes")
-	private final class DefaultStreamListenerSetupMethodOrchestrator
+	private final class DefaultReactorStreamListenerSetupMethodOrchestrator
 			implements ReactorStreamListenerSetupMethodOrchestrator {
 
 		private final ConfigurableApplicationContext applicationContext;
@@ -464,7 +465,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 
 		private final Collection<StreamListenerResultAdapter> streamListenerResultAdapters;
 
-		private DefaultStreamListenerSetupMethodOrchestrator(
+		private DefaultReactorStreamListenerSetupMethodOrchestrator(
 				ConfigurableApplicationContext applicationContext,
 				Collection<StreamListenerParameterAdapter> streamListenerParameterAdapters,
 				Collection<StreamListenerResultAdapter> streamListenerResultAdapters) {
@@ -497,7 +498,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 				Object[] adaptedInboundArguments = adaptAndRetrieveInboundArguments(
 						method, methodAnnotatedInboundName, this.applicationContext,
 						this.streamListenerParameterAdapters.toArray(toSlpaArray));
-				invokeStreamListenerResultAdapter(method, bean,
+				invokeReactorStreamListenerResultAdapter(method, bean,
 						methodAnnotatedOutboundName, adaptedInboundArguments);
 			}
 			else {
@@ -512,7 +513,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		}
 
 		@SuppressWarnings("unchecked")
-		private void invokeStreamListenerResultAdapter(Method method, Object bean,
+		private void invokeReactorStreamListenerResultAdapter(Method method, Object bean,
 				String outboundName, Object... arguments) {
 			try {
 				if (Void.TYPE.equals(method.getReturnType())) {
@@ -547,7 +548,8 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			}
 		}
 
-		private void registerHandlerMethodOnListenedChannel(Method method, ReactorStreamListener streamListener, Object bean) {
+		private void registerHandlerMethodOnListenedChannel(
+				Method method, ReactorStreamListener streamListener, Object bean) {
 			Assert.hasText(streamListener.value(), "The binding name cannot be null");
 			if (!StringUtils.hasText(streamListener.value())) {
 				throw new BeanInitializationException(
@@ -566,7 +568,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			ReactorStreamListenerMethodUtils.validateStreamListenerMessageHandler(method);
 			ReactorStreamListenerAnnotationBeanPostProcessor.this.mappedListenerMethods.add(
 					streamListener.value(),
-					new StreamListenerHandlerMethodMapping(bean, method,
+					new ReactorStreamListenerHandlerMethodMapping(bean, method,
 							streamListener.condition(), defaultOutputChannel,
 							streamListener.copyHeaders()));
 		}
