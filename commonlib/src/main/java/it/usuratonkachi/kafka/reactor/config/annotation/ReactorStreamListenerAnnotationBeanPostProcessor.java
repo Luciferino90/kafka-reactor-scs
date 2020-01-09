@@ -18,6 +18,8 @@ package it.usuratonkachi.kafka.reactor.config.annotation;
 
 import it.usuratonkachi.kafka.reactor.config.ReactorKafkaProperties;
 import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.aop.framework.Advised;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
@@ -47,12 +49,17 @@ import org.springframework.integration.handler.AbstractReplyProducingMessageHand
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.core.DestinationResolver;
+import org.springframework.messaging.handler.annotation.Headers;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.support.MessageHandlerMethodFactory;
 import org.springframework.messaging.handler.invocation.InvocableHandlerMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.*;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -175,21 +182,73 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			handler.afterPropertiesSet();
 			this.applicationContext.getBeanFactory().registerSingleton(
 					handler.getClass().getSimpleName() + handler.hashCode(), handler);
-			Class<?> clazz = Objects.requireNonNull(this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey())).getMethod().getParameterTypes()[0];
+
+			StreamListenerHandlerMethodMapping listener = this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey());
+
+			if (listener == null || listener.getMethod() == null) throw new RuntimeException("Cannot find method " + mappedBindingEntry.getKey());
+
+			Class<?> clazz = getPayloadType(listener.getMethod());
+
 			getReactorStreamDispatcher(clazz, mappedBindingEntry.getKey())
-					.listen(getFunctionListener(mappedBindingEntry));
+					.listen(getFunctionListener(listener));
 		}
 		this.mappedListenerMethods.clear();
 	}
 
-	@SuppressWarnings({"unchecked", "rawtypes"})
-	private Function<Message<?>, Mono<Void>> getFunctionListener(Map.Entry<String, List<StreamListenerHandlerMethodMapping>> mappedBindingEntry){
-		Object targetBean = Objects.requireNonNull(this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey())).getTargetBean();
-		Method handlerMethod = Objects.requireNonNull(this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey())).getMethod();
+	private Class<?> getPayloadType(Method method){
+		Integer pos = getPayloadPosition(method.getParameterAnnotations());
+		return method.getParameterTypes()[pos];
 
+	}
+
+	private Integer getPayloadPosition(Annotation[][] annotations){
+		for (int i = 0; i < annotations.length; i++){
+			Annotation[] anns = annotations[i];
+			for (Annotation ann : anns) {
+				if (Payload.class.equals(ann.annotationType()))
+					return i;
+			}
+		}
+		throw new RuntimeException("No Payload annotation found!");
+	}
+
+	@AllArgsConstructor
+	private class ParamsPosition {
+		@Getter
+		private int payloadPosition;
+		@Getter
+		private int headerPosition;
+	}
+
+	private ParamsPosition getParameterPosition(Annotation[][] annotations){
+		int payloadPosition = -1;
+		int headerPosition = -1;
+		for (int i = 0; i < annotations.length; i++){
+			Annotation[] anns = annotations[i];
+			for (Annotation ann : anns) {
+				if (Payload.class.equals(ann.annotationType()))
+					payloadPosition = i;
+				else if (Headers.class.equals(ann.annotationType()))
+					headerPosition = i;
+			}
+		}
+		return new ParamsPosition(payloadPosition, headerPosition);
+	}
+
+	private Object[] composeVarArgsParams(Method method, Message<?> message){
+		ParamsPosition parameterPosition = getParameterPosition(method.getParameterAnnotations());
+		Object[] params = new Object[2];
+		params[parameterPosition.getPayloadPosition()] = message.getPayload();
+		params[parameterPosition.getHeaderPosition()] = message.getHeaders();
+		return params;
+	}
+
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private Function<Message<?>, Mono<Void>> getFunctionListener(StreamListenerHandlerMethodMapping listener){
 		return message -> {
 			try {
-				return (Mono) handlerMethod.invoke(targetBean, message.getPayload(), message.getHeaders());
+				return (Mono) listener.getMethod().invoke(listener.getTargetBean(), composeVarArgsParams(listener.getMethod(), message));
 			} catch (IllegalAccessException | InvocationTargetException ex) {
 				throw new RuntimeException(ex);
 			}
