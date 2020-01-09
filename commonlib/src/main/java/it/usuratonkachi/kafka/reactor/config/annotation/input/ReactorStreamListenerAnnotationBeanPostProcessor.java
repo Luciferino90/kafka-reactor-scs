@@ -58,10 +58,12 @@ import org.springframework.util.*;
 import reactor.core.publisher.Mono;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * {@link BeanPostProcessor} that handles {@link ReactorStreamListener} annotations found on bean
@@ -263,10 +265,12 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 	@Override
 	public final Object postProcessAfterInitialization(Object bean, final String beanName)
 			throws BeansException {
+		if ("puppa".equalsIgnoreCase(beanName))
+			System.out.println("Stop");
+		System.out.println("FANCIU: " + beanName);
 		Class<?> targetClass = AopUtils.isAopProxy(bean) ? AopUtils.getTargetClass(bean)
 				: bean.getClass();
-		Method[] uniqueDeclaredMethods = ReflectionUtils
-				.getUniqueDeclaredMethods(targetClass);
+		Field[] fields = Arrays.stream(ReflectionUtils.getDeclaredFields(targetClass)).filter(field -> field.getAnnotatedType() != null).collect(;Collectors.toList())
 		for (Method method : uniqueDeclaredMethods) {
 			ReactorStreamListener streamListener = AnnotatedElementUtils
 					.findMergedAnnotation(method, ReactorStreamListener.class);

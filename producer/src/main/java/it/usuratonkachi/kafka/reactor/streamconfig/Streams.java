@@ -1,27 +1,28 @@
 package it.usuratonkachi.kafka.reactor.streamconfig;
 
 import org.springframework.cloud.stream.annotation.Output;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.stereotype.Component;
+
+import static it.usuratonkachi.kafka.reactor.streamconfig.StreamsConfiguration.*;
 
 /**
  */
-public interface Streams {
-
-	String MAIL_CHANNEL_OUTPUT = "mail-kafka-out";
-	String MESSAGE_CHANNEL_OUTPUT = "message-kafka-out";
-	String MMS_CHANNEL_OUTPUT = "mms-kafka-out";
-	String SMS_CHANNEL_OUTPUT = "sms-kafka-out";
+@Component(value = "puppa")
+public class Streams {
 
 	@Output(MAIL_CHANNEL_OUTPUT)
-	MessageChannel outboundMailKafka();
+	MessageChannel outboundMailKafka;
 
 	@Output(MESSAGE_CHANNEL_OUTPUT)
-	MessageChannel outboundMessageKafka();
+	MessageChannel outboundMessageKafka;
 
 	@Output(MMS_CHANNEL_OUTPUT)
-	MessageChannel outboundMmsKafka();
+	MessageChannel outboundMmsKafka;
 
 	@Output(SMS_CHANNEL_OUTPUT)
-	MessageChannel outboundSmsKafka();
+	MessageChannel outboundSmsKafka;
 
 }
