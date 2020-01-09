@@ -10,6 +10,7 @@ import reactor.kafka.sender.SenderOptions;
 import reactor.kafka.sender.SenderRecord;
 import reactor.kafka.sender.SenderResult;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class ReactorProducer {
@@ -17,6 +18,7 @@ public class ReactorProducer {
     private final KafkaProducerProperties kafkaProducerProperties;
     private final ProducerProperties producerProperties;
     private final String hosts;
+
     private final KafkaSender<byte[], byte[]> producer;
 
     public ReactorProducer(
@@ -32,12 +34,13 @@ public class ReactorProducer {
     }
 
     private Map<String, Object> kafkaProducerConfiguration() {
-        return Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, hosts,
-                ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 1,
-                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class,
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class
-        );
+        Map<String, String> scsProps = kafkaProducerProperties != null ? kafkaProducerProperties.getConfiguration() : new HashMap<>();
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, hosts);
+        properties.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, scsProps.getOrDefault(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "1"));
+        properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, scsProps.getOrDefault(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, ByteArraySerializer.class.getName()));
+        properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, scsProps.getOrDefault(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, ByteArraySerializer.class.getName()));
+        return properties;
     }
 
     private SenderOptions<byte[], byte[]> kafkaSenderOptions() {

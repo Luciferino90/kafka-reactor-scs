@@ -1,6 +1,7 @@
 package it.usuratonkachi.kafka.reactor.config;
 
 import lombok.Getter;
+import org.springframework.cloud.stream.binder.kafka.properties.KafkaProducerProperties;
 import org.springframework.cloud.stream.config.BindingProperties;
 
 import java.util.Arrays;
@@ -60,8 +61,15 @@ public class ReactorKafkaConfiguration {
 		});
 
 		bindingPropertiesProducer.ifPresent(bindingProperties -> {
+			KafkaProducerProperties kafkaProducerProperties = null;
+			if (reactorKafkaProperties.getKafkaExtendedBindingProperties() != null
+					&& reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings() != null
+					&& !reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings().isEmpty()
+					&& reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings().containsKey(labelTopicName)
+			)
+				kafkaProducerProperties = reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings().get(labelName).getProducer();
 			producer = new ReactorProducer(
-					null, //reactiveKafkaProperties.getKafkaExtendedBindingProperties().getBindings().get(labelName).getProducer(),
+					kafkaProducerProperties,
 					reactorKafkaProperties.getBindingServiceProperties().getBindings().get(labelName).getProducer(),
 					hosts
 			);

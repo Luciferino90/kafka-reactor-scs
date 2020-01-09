@@ -46,32 +46,46 @@ spring:
           mail-kafka-in:
             consumer:
               configuration:
-                auto-commit-offset: true
+                enable.auto.commit: true
                 auto.commit.interval.ms: 0
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
+                partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
+                auto.offset.reset: earliest
           message-kafka-in:
             consumer:
               configuration:
+                enable.auto.commit: true
+                auto.commit.interval.ms: 0
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
+                partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
+                auto.offset.reset: earliest
           mms-kafka-in:
             consumer:
               configuration:
+                enable.auto.commit: true
+                auto.commit.interval.ms: 0
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
+                partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
+                auto.offset.reset: earliest
           sms-kafka-in:
             consumer:
               configuration:
+                enable.auto.commit: true
+                auto.commit.interval.ms: 0
                 max.poll.records: 1
                 max.poll.interval.ms: 120000
+                partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
+                auto.offset.reset: earliest
       bindings:
         mail-kafka-in: # consumer
           group: ${spring.application.name}
           destination: mail-kafka-topic
           contentType: application/json
           consumer:
-            auto-commit-offset: true
+            enable.auto.commit: true
             auto.commit.interval.ms: 0
             concurrency: 10
             max-attempts: 3

@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.springframework.cloud.stream.binder.ConsumerProperties;
 import org.springframework.cloud.stream.binder.kafka.properties.KafkaConsumerProperties;
 import org.springframework.cloud.stream.config.BindingProperties;
+import org.springframework.kafka.listener.ContainerProperties;
 import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
@@ -27,6 +28,7 @@ public class ReactorConsumer {
     private List<Integer> assignedPartitions;
     @Getter
     private KafkaReceiver<byte[], byte[]> receiver;
+    private ContainerProperties.AckMode ackMode = ContainerProperties.AckMode.MANUAL;
 
     private Map<Integer, List<ReceiverRecord<byte[], byte[]>>> toAck = new ConcurrentHashMap<>();
 
@@ -39,6 +41,10 @@ public class ReactorConsumer {
         receiverRecord.receiverOffset().acknowledge();
         receiverRecord.receiverOffset().commit().subscribe();
         Optional.ofNullable(toAck.get(receiverRecord.partition())).ifPresent(pendingAck -> pendingAck.remove(receiverRecord));
+    }
+
+    public Boolean hasManualAck(){
+        return ContainerProperties.AckMode.MANUAL.equals(ackMode);
     }
 
     public ReactorConsumer(
@@ -66,18 +72,24 @@ public class ReactorConsumer {
     }
 
     private Map<String, Object> kafkaConsumerConfiguration() {
-        return Map.of(
-                ConsumerConfig.CLIENT_ID_CONFIG, bindingProperties.getDestination() + "-" + UUID.randomUUID().toString(),
-                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
-                ConsumerConfig.GROUP_ID_CONFIG, group,
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, hosts,
-                ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "60000",
-                ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1",
-                ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RangeAssignor",
-                //ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false"
-                ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true",
-                ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100"
-        );
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(ConsumerConfig.CLIENT_ID_CONFIG, bindingProperties.getDestination() + "-" + UUID.randomUUID().toString());
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, group);
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, hosts);
+
+        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, kafkaConsumerProperties.getConfiguration().getOrDefault(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"));
+        properties.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, kafkaConsumerProperties.getConfiguration().getOrDefault(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, "org.apache.kafka.clients.consumer.RangeAssignor"));
+
+        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, kafkaConsumerProperties.getConfiguration().getOrDefault(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "120000"));
+        properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, kafkaConsumerProperties.getConfiguration().getOrDefault(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1"));
+        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, kafkaConsumerProperties.getConfiguration().getOrDefault(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false"));
+
+        if ("true".equals(properties.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG))) {
+            properties.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, kafkaConsumerProperties.getConfiguration().getOrDefault(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "false"));
+            ackMode = ContainerProperties.AckMode.RECORD;
+        }
+
+        return properties;
     }
 
     private ReceiverOptions<byte[], byte[]> kafkaReceiverOptions() {

@@ -59,6 +59,21 @@ public class ReactorStreamDispatcher<T> {
 		this.reactorKafkaConfiguration = new ReactorKafkaConfiguration(reactiveKafkaProperties, labelTopicName);
 	}
 
+	public void listen(Function<Message<T>, Mono<Void>> function) {
+		if (alreadyStarted) return;
+		else alreadyStarted = true;
+		ReactorConsumer consumer = reactorKafkaConfiguration.getConsumer();
+		if (consumer != null) {
+			if (consumer.hasManualAck())
+				listenAtleastOnce(function, consumer);
+			else
+				listenAtmostOnce(function, consumer);
+		} else {
+			throw new RuntimeException(
+					"No consumer options for topic with label " + reactorKafkaConfiguration.getTopicName() + " configured!");
+		}
+	}
+
 	/**
 	 * Metodo di ascolto del listener. Si registra una sola volta a causa della doppia lettura delle classi da parte di spring
 	 * (Component e Component$Proxy).
@@ -81,98 +96,83 @@ public class ReactorStreamDispatcher<T> {
 	 * @param function
 	 * 		function da eseguire su ciascun messaggio
 	 */
-	public void listen(Function<Message<T>, Mono<Void>> function) {
-		if (alreadyStarted) return;
-		else alreadyStarted = true;
+	private void listenAtleastOnce(Function<Message<T>, Mono<Void>> function, ReactorConsumer consumer) {
 		Map<Integer, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
-		ReactorConsumer consumer = reactorKafkaConfiguration.getConsumer();
-		if (reactorKafkaConfiguration.getConsumer() != null) {
-			Integer concurrency = reactorKafkaConfiguration.getConcurrency();
-			consumer.receive()
-					.buffer(concurrency)
-					.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
-							.filter(r -> {
-								Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(r.partition()));
-								return oldOffset.isEmpty() || oldOffset.get() < r.offset();
-							})
-							.switchIfEmpty(Mono.defer(() -> {
-								log.debug("Message alrerady managed by this consumer. Skipped.");
-								return Mono.empty();
-							}))
-							.filter(r -> consumer.hasPartitionAssigned(r.partition()))
-							.switchIfEmpty(Mono.defer(() -> {
-								log.debug("Partition revoked, cannot commit message. Skipped.");
-								return Mono.empty();
-							}))
-							.doOnNext(receiverRecord -> partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset()))
-							.doOnNext(consumer::toBeAcked)
-							.flatMap(receiverRecord -> {
-								try {
-									return function.apply(receiverRecordToMessage(receiverRecord))
-											.switchIfEmpty(Mono.defer(() -> {
-												if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
-													consumer.ackRecord(receiverRecord);
-												}
-												return Mono.empty();
-											}))
-											.doOnError(RuntimeException.class, businessException -> {
-												if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
-													consumer.ackRecord(receiverRecord);
-												}
-											});
-								} catch (Exception ex) {
-									log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
-								}
-								return Mono.empty();
-							})
-					)
-					.doOnError(Throwable::printStackTrace)
-					.subscribe();
-		} else {
-			throw new RuntimeException(
-					"No consumer options for topic with label " + reactorKafkaConfiguration.getTopicName() + " configured!");
-		}
+		Integer concurrency = reactorKafkaConfiguration.getConcurrency();
+		consumer.receive()
+				.buffer(concurrency)
+				.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
+						.filter(r -> {
+							Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(r.partition()));
+							return oldOffset.isEmpty() || oldOffset.get() < r.offset();
+						})
+						.switchIfEmpty(Mono.defer(() -> {
+							log.debug("Message alrerady managed by this consumer. Skipped.");
+							return Mono.empty();
+						}))
+						.filter(r -> consumer.hasPartitionAssigned(r.partition()))
+						.switchIfEmpty(Mono.defer(() -> {
+							log.debug("Partition revoked, cannot commit message. Skipped.");
+							return Mono.empty();
+						}))
+						.doOnNext(receiverRecord -> partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset()))
+						.doOnNext(consumer::toBeAcked)
+						.flatMap(receiverRecord -> {
+							try {
+								return function.apply(receiverRecordToMessage(receiverRecord))
+										.switchIfEmpty(Mono.defer(() -> {
+											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
+												consumer.ackRecord(receiverRecord);
+											}
+											return Mono.empty();
+										}))
+										.doOnError(RuntimeException.class, businessException -> {
+											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
+												consumer.ackRecord(receiverRecord);
+											}
+										});
+							} catch (Exception ex) {
+								log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+							}
+							return Mono.empty();
+						})
+				)
+				.doOnError(Throwable::printStackTrace)
+				.subscribe();
+
 	}
 
-	public void listenAtmostOnce(Function<Message<T>, Mono<Void>> function) {
-		if (alreadyStarted) return;
-		else alreadyStarted = true;
+	private void listenAtmostOnce(Function<Message<T>, Mono<Void>> function, ReactorConsumer consumer) {
 		Map<Integer, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
-		ReactorConsumer consumer = reactorKafkaConfiguration.getConsumer();
-		if (reactorKafkaConfiguration.getConsumer() != null) {
-			Integer concurrency = reactorKafkaConfiguration.getConcurrency();
-			consumer.receiveAtmostOnce()
-					.buffer(concurrency)
-					.concatMap(consumerRecords -> Flux.fromIterable(consumerRecords)
-							.filter(r -> {
-								Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(r.partition()));
-								return oldOffset.isEmpty() || oldOffset.get() < r.offset();
-							})
-							.switchIfEmpty(Mono.defer(() -> {
-								log.debug("Message alrerady managed by this consumer. Skipped.");
-								return Mono.empty();
-							}))
-							.filter(r -> consumer.hasPartitionAssigned(r.partition()))
-							.switchIfEmpty(Mono.defer(() -> {
-								log.debug("Partition revoked, cannot commit message. Skipped.");
-								return Mono.empty();
-							}))
-							.doOnNext(receiverRecord -> partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset()))
-							.flatMap(consumerRecord -> {
-								try {
-									return function.apply(consumerRecordToMessage(consumerRecord));
-								} catch (Exception ex) {
-									log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
-								}
-								return Mono.empty();
-							})
-					)
-					.doOnError(Throwable::printStackTrace)
-					.subscribe();
-		} else {
-			throw new RuntimeException(
-					"No consumer options for topic with label " + reactorKafkaConfiguration.getTopicName() + " configured!");
-		}
+		Integer concurrency = reactorKafkaConfiguration.getConcurrency();
+		consumer.receiveAtmostOnce()
+				.buffer(concurrency)
+				.concatMap(consumerRecords -> Flux.fromIterable(consumerRecords)
+						.filter(r -> {
+							Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(r.partition()));
+							return oldOffset.isEmpty() || oldOffset.get() < r.offset();
+						})
+						.switchIfEmpty(Mono.defer(() -> {
+							log.debug("Message alrerady managed by this consumer. Skipped.");
+							return Mono.empty();
+						}))
+						.filter(r -> consumer.hasPartitionAssigned(r.partition()))
+						.switchIfEmpty(Mono.defer(() -> {
+							log.debug("Partition revoked, cannot commit message. Skipped.");
+							return Mono.empty();
+						}))
+						.doOnNext(receiverRecord -> partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset()))
+						.flatMap(consumerRecord -> {
+							try {
+								return function.apply(consumerRecordToMessage(consumerRecord));
+							} catch (Exception ex) {
+								log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+							}
+							return Mono.empty();
+						})
+				)
+				.doOnError(Throwable::printStackTrace)
+				.subscribe();
 	}
 
 	/**
