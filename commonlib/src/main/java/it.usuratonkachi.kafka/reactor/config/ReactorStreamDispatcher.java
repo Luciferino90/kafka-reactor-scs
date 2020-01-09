@@ -3,6 +3,7 @@ package it.usuratonkachi.kafka.reactor.config;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -21,6 +22,7 @@ import reactor.util.function.Tuples;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -66,36 +68,7 @@ public class ReactorStreamDispatcher<T> {
 	 *
 	 * L'ordinamento per partizione migliora la stabilità della lettura dei messaggi, riducendo eventuali gestioni multiple.
 	 *
-	 * @param function
-	 * 		function da eseguire su ciascun messaggio
-	 */
-	public void listen(Function<Message<T>, Mono<Void>> function) {
-		if (alreadyStarted) return;
-		else alreadyStarted = true;
-		ReactorKafkaConfiguration.ConsumerConfiguration consumer = reactorKafkaConfiguration.getConsumer();
-		if (reactorKafkaConfiguration.getConsumer() != null) {
-			Integer concurrency = reactorKafkaConfiguration.getConcurrency();
-			reactorKafkaConfiguration.getConsumer().getReceiver().receive()
-					//.concatMap(receiverRecord -> listen(function, receiverRecord))
-					.groupBy(r -> r.receiverOffset().topicPartition())
-					.filter(r -> r.key() != null && consumer.getNotRevokedPartition().contains(r.key().toString()))
-						.switchIfEmpty(Mono.defer(() -> {
-							log.warn("Scartata Partition revocata!");
-							return Mono.empty();
-						}))
-					.concatMap(e -> e.buffer(concurrency)
-							.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
-									.flatMap(receiverRecord -> listen(function, receiverRecord))
-							)
-					)
-					.subscribe();
-		} else {
-			throw new RuntimeException(
-					"No consumer options for topic with label " + reactorKafkaConfiguration.getTopicName() + " configured!");
-		}
-	}
-
-	/**
+	 *
 	 * Metodo che si occupa di gestire il singolo messaggio eseguendo la function passata da chi utilizza la libreria.
 	 *
 	 *  Per poter gestire l'ack e il commit dei messaggi ci si aspetta che il consumer torni alla libreria una qualche forma
@@ -106,27 +79,100 @@ public class ReactorStreamDispatcher<T> {
 	 * Le business exception invece committano l'ack.
 	 *
 	 * @param function
-	 * 		function da gestire sul messaggio
-	 * @param receiverRecord
-	 * 		messaggio letto dal topic
-	 * @return
+	 * 		function da eseguire su ciascun messaggio
 	 */
-	private Mono<Void> listen(Function<Message<T>, Mono<Void>> function, ReceiverRecord<byte[], byte[]> receiverRecord){
-		try {
-			return function.apply(receiverRecordToMessage(receiverRecord))
-					.switchIfEmpty(Mono.defer(() -> {
-						receiverRecord.receiverOffset().acknowledge();
-						receiverRecord.receiverOffset().commit();
-						return Mono.empty();
-					}))
-					.doOnError(RuntimeException.class, e -> {
-						receiverRecord.receiverOffset().acknowledge();
-						receiverRecord.receiverOffset().commit();
-					});
-		} catch (Exception ex) {
-			log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+	public void listen(Function<Message<T>, Mono<Void>> function) {
+		if (alreadyStarted) return;
+		else alreadyStarted = true;
+		Map<Integer, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
+		ReactorConsumer consumer = reactorKafkaConfiguration.getConsumer();
+		if (reactorKafkaConfiguration.getConsumer() != null) {
+			Integer concurrency = reactorKafkaConfiguration.getConcurrency();
+			consumer.receive()
+					.buffer(concurrency)
+					.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
+							.filter(r -> {
+								Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(r.partition()));
+								return oldOffset.isEmpty() || oldOffset.get() < r.offset();
+							})
+							.switchIfEmpty(Mono.defer(() -> {
+								log.debug("Message alrerady managed by this consumer. Skipped.");
+								return Mono.empty();
+							}))
+							.filter(r -> consumer.hasPartitionAssigned(r.partition()))
+							.switchIfEmpty(Mono.defer(() -> {
+								log.debug("Partition revoked, cannot commit message. Skipped.");
+								return Mono.empty();
+							}))
+							.doOnNext(receiverRecord -> partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset()))
+							.doOnNext(consumer::toBeAcked)
+							.flatMap(receiverRecord -> {
+								try {
+									return function.apply(receiverRecordToMessage(receiverRecord))
+											.switchIfEmpty(Mono.defer(() -> {
+												if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
+													consumer.ackRecord(receiverRecord);
+												}
+												return Mono.empty();
+											}))
+											.doOnError(RuntimeException.class, businessException -> {
+												if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
+													consumer.ackRecord(receiverRecord);
+												}
+											});
+								} catch (Exception ex) {
+									log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+								}
+								return Mono.empty();
+							})
+					)
+					.doOnError(Throwable::printStackTrace)
+					.subscribe();
+		} else {
+			throw new RuntimeException(
+					"No consumer options for topic with label " + reactorKafkaConfiguration.getTopicName() + " configured!");
 		}
-		return Mono.empty();
+	}
+
+	public void listenAtmostOnce(Function<Message<T>, Mono<Void>> function) {
+		if (alreadyStarted) return;
+		else alreadyStarted = true;
+		Map<Integer, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
+		ReactorConsumer consumer = reactorKafkaConfiguration.getConsumer();
+		if (reactorKafkaConfiguration.getConsumer() != null) {
+			Integer concurrency = reactorKafkaConfiguration.getConcurrency();
+			consumer.receiveAtmostOnce()
+					.buffer(concurrency)
+					.concatMap(consumerRecords -> Flux.fromIterable(consumerRecords)
+							.filter(r -> {
+								Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(r.partition()));
+								return oldOffset.isEmpty() || oldOffset.get() < r.offset();
+							})
+							.switchIfEmpty(Mono.defer(() -> {
+								log.debug("Message alrerady managed by this consumer. Skipped.");
+								return Mono.empty();
+							}))
+							.filter(r -> consumer.hasPartitionAssigned(r.partition()))
+							.switchIfEmpty(Mono.defer(() -> {
+								log.debug("Partition revoked, cannot commit message. Skipped.");
+								return Mono.empty();
+							}))
+							.doOnNext(receiverRecord -> partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset()))
+							.flatMap(consumerRecord -> {
+								try {
+									return function.apply(consumerRecordToMessage(consumerRecord));
+								} catch (Exception ex) {
+									log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+								}
+								return Mono.empty();
+							})
+					)
+					.doOnError(Throwable::printStackTrace)
+					.subscribe();
+		} else {
+			throw new RuntimeException(
+					"No consumer options for topic with label " + reactorKafkaConfiguration.getTopicName() + " configured!");
+		}
 	}
 
 	/**
@@ -229,6 +275,47 @@ public class ReactorStreamDispatcher<T> {
 		} catch (ClassNotFoundException e) {
 			log.error("Could not deserialize class " + messageHeaders.get("__TypeId__"));
 			deserializeObject(receiverRecord.value());
+		}
+		assert deserializedValue != null;
+		return new GenericMessage<>(deserializedValue, messageHeaders);
+	}
+
+	/**
+	 * Metodo che deserializza gli header in byte array in una mappa.
+	 * @param receiverRecord
+	 * @return
+	 */
+	private Map<String, Object> consumerRecordToHeaders(ConsumerRecord<byte[], byte[]> receiverRecord){
+		return StreamSupport.stream(receiverRecord.headers().spliterator(), false)
+				.map(header -> Tuples.of(header.key(), header.value()))
+				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
+	}
+
+	/**
+	 * Metodo che deserializza un messaggio in byte array in un Message del tipo configurato nel dispatcher.
+	 * @param consumerRecord
+	 * @return
+	 */
+	private Message<T> consumerRecordToMessage(ConsumerRecord<byte[], byte[]> consumerRecord) {
+		Map<String, Object> headersMap = consumerRecordToHeaders(consumerRecord);
+		MessageHeaders headers = new MessageHeaders(headersMap);
+		return consumerRecordToMessage(consumerRecord, headers);
+	}
+
+	/**
+	 * Metodo che deserializza un messaggio in byte array in un Message del tipo configurato nel dispatcher.
+	 * @param consumerRecord
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	private Message<T> consumerRecordToMessage(ConsumerRecord<byte[], byte[]> consumerRecord, MessageHeaders messageHeaders) {
+		T deserializedValue = null;
+		try {
+			Class<T> c = (Class<T>) Class.forName((String) Optional.ofNullable(messageHeaders.get("__TypeId__")).orElse(clazz.getName()));
+			deserializedValue = deserializeObject(consumerRecord.value(), c);
+		} catch (ClassNotFoundException e) {
+			log.error("Could not deserialize class " + messageHeaders.get("__TypeId__"));
+			deserializeObject(consumerRecord.value());
 		}
 		assert deserializedValue != null;
 		return new GenericMessage<>(deserializedValue, messageHeaders);

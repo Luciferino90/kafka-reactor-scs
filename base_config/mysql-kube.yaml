@@ -50,9 +50,6 @@ spec:
             - name: MYSQL_DATABASE
               value: kafkacheck
           resources: {}
-          volumeMounts:
-            - name: mysql
-              mountPath: /var/lib/mysql
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           imagePullPolicy: Always
