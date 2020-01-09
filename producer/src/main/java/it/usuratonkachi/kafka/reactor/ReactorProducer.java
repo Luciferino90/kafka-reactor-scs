@@ -5,20 +5,26 @@ import it.usuratonkachi.kafka.dto.Mail;
 import it.usuratonkachi.kafka.dto.Message;
 import it.usuratonkachi.kafka.dto.Mms;
 import it.usuratonkachi.kafka.dto.Sms;
-import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
+import it.usuratonkachi.kafka.reactor.config.annotation.output.ReactorMessageChannel;
+import it.usuratonkachi.kafka.reactor.streamconfig.Streams;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
+import javax.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+
+import static it.usuratonkachi.kafka.reactor.streamconfig.Streams.*;
 
 @Component
 @RequiredArgsConstructor
@@ -32,12 +38,20 @@ public class ReactorProducer implements CommandLineRunner {
 	@Value("${default.waittime:1000}")
 	private Long waittime;
 
-	private final ReactorStreamDispatcher<Mail> mailDispatcher;
-	private final ReactorStreamDispatcher<Message> messageDispatcher;
-	private final ReactorStreamDispatcher<Mms> mmsDispatcher;
-	private final ReactorStreamDispatcher<Sms> smsDispatcher;
+	@Autowired
+	private Streams streams;
+
+	@ReactorMessageChannel(MAIL_CHANNEL_OUTPUT)
+	private MessageChannel mailDispatcher;
+	@ReactorMessageChannel(MESSAGE_CHANNEL_OUTPUT)
+	private MessageChannel messageDispatcher;
+	@ReactorMessageChannel(MMS_CHANNEL_OUTPUT)
+	private MessageChannel mmsDispatcher;
+	@ReactorMessageChannel(SMS_CHANNEL_OUTPUT)
+	private MessageChannel smsDispatcher;
 
 	private final KafkaService kafkaService;
+
 
 	@Override
 	public void run(String... args) {

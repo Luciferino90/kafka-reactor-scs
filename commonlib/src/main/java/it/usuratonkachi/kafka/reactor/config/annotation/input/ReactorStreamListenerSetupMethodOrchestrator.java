@@ -112,8 +112,7 @@ public interface ReactorStreamListenerSetupMethodOrchestrator {
 						.getBean((String) targetReferenceValue);
 				// Iterate existing parameter adapters first
 				for (StreamListenerParameterAdapter streamListenerParameterAdapter : ReactorStreamListenerParameterAdapters) {
-					if (streamListenerParameterAdapter.supports(targetBean.getClass(),
-							methodParameter)) {
+					if (streamListenerParameterAdapter.supports(targetBean.getClass(), methodParameter)) {
 						arguments[parameterIndex] = streamListenerParameterAdapter
 								.adapt(targetBean, methodParameter);
 						break;

@@ -14,56 +14,36 @@
  * limitations under the License.
  */
 
-package it.usuratonkachi.kafka.reactor.config.annotation.input;
+package it.usuratonkachi.kafka.reactor.config.annotation.output;
 
 import it.usuratonkachi.kafka.reactor.config.ReactorKafkaProperties;
-import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import it.usuratonkachi.kafka.reactor.config.annotation.input.ReactorStreamListener;
+import it.usuratonkachi.kafka.reactor.config.annotation.input.ReactorStreamListenerSetupMethodOrchestrator;
 import lombok.RequiredArgsConstructor;
-import org.springframework.aop.framework.Advised;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
 import org.springframework.beans.factory.config.BeanPostProcessor;
-import org.springframework.cloud.stream.annotation.Input;
-import org.springframework.cloud.stream.annotation.Output;
-import org.springframework.cloud.stream.binding.StreamListenerErrorMessages;
 import org.springframework.cloud.stream.binding.StreamListenerParameterAdapter;
-import org.springframework.cloud.stream.binding.StreamListenerResultAdapter;
 import org.springframework.cloud.stream.config.SpringIntegrationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.core.MethodParameter;
-import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.Ordered;
+import org.springframework.core.PriorityOrdered;
 import org.springframework.expression.EvaluationContext;
-import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.integration.context.IntegrationContextUtils;
-import org.springframework.integration.handler.AbstractReplyProducingMessageHandler;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.core.DestinationResolver;
-import org.springframework.messaging.handler.annotation.Headers;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.support.MessageHandlerMethodFactory;
-import org.springframework.messaging.handler.invocation.InvocableHandlerMethod;
 import org.springframework.stereotype.Component;
-import org.springframework.util.*;
-import reactor.core.publisher.Mono;
+import org.springframework.util.Assert;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * {@link BeanPostProcessor} that handles {@link ReactorStreamListener} annotations found on bean
@@ -74,22 +54,18 @@ import java.util.stream.Collectors;
  */
 @Component
 @RequiredArgsConstructor
-public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPostProcessor, ApplicationContextAware, SmartInitializingSingleton {
+public class ReactorMessageChannelAnnotationBeanPostProcessor implements PriorityOrdered, BeanPostProcessor, ApplicationContextAware, SmartInitializingSingleton {
 
-	@AllArgsConstructor
-	private static class ParamsPosition {
-		@Getter
-		private int payloadPosition;
-		@Getter
-		private int headerPosition;
+	public int getOrder(){
+		return Ordered.LOWEST_PRECEDENCE - 1;
 	}
 
-	private final ReactorKafkaProperties reactorKafkaProperties;
+	private ReactorKafkaProperties reactorKafkaProperties;
 
 	private static final SpelExpressionParser SPEL_EXPRESSION_PARSER = new SpelExpressionParser();
 
 	// @checkstyle:off
-	private final MultiValueMap<String, ReactorStreamListenerHandlerMethodMapping> mappedListenerMethods = new LinkedMultiValueMap<>();
+	//private final MultiValueMap<String, ReactorStreamListenerHandlerMethodMapping> mappedListenerMethods = new LinkedMultiValueMap<>();
 
 	// @checkstyle:on
 
@@ -133,7 +109,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		this.injectAndPostProcessDependencies();
 		EvaluationContext evaluationContext = IntegrationContextUtils
 				.getEvaluationContext(this.applicationContext.getBeanFactory());
-		for (Map.Entry<String, List<ReactorStreamListenerHandlerMethodMapping>> mappedBindingEntry : this.mappedListenerMethods
+		/*for (Map.Entry<String, List<ReactorStreamListenerHandlerMethodMapping>> mappedBindingEntry : this.mappedListenerMethods
 				.entrySet()) {
 			ArrayList<DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper> handlers;
 			handlers = new ArrayList<>();
@@ -190,7 +166,8 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			handler.setApplicationContext(this.applicationContext);
 			handler.setChannelResolver(this.binderAwareChannelResolver);
 			handler.afterPropertiesSet();
-			this.applicationContext.getBeanFactory().registerSingleton(handler.getClass().getSimpleName() + handler.hashCode(), handler);
+			this.applicationContext.getBeanFactory().registerSingleton(
+					handler.getClass().getSimpleName() + handler.hashCode(), handler);
 
 			ReactorStreamListenerHandlerMethodMapping listener = this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey());
 
@@ -198,82 +175,31 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 
 			Class<?> clazz = getPayloadType(listener.getMethod());
 
-			getReactorStreamDispatcher(clazz, mappedBindingEntry.getKey()).listen(getFunctionListener(listener));
-		}
-		this.mappedListenerMethods.clear();
-	}
-
-	private Class<?> getPayloadType(Method method){
-		Integer pos = getPayloadPosition(method.getParameterAnnotations());
-		return method.getParameterTypes()[pos];
-
-	}
-
-	private Integer getPayloadPosition(Annotation[][] annotations){
-		for (int i = 0; i < annotations.length; i++){
-			Annotation[] anns = annotations[i];
-			for (Annotation ann : anns) {
-				if (Payload.class.equals(ann.annotationType()))
-					return i;
-			}
-		}
-		throw new RuntimeException("No Payload annotation found!");
-	}
-
-	private ParamsPosition getParameterPosition(Annotation[][] annotations){
-		int payloadPosition = -1;
-		int headerPosition = -1;
-		for (int i = 0; i < annotations.length; i++){
-			Annotation[] anns = annotations[i];
-			for (Annotation ann : anns) {
-				if (Payload.class.equals(ann.annotationType()))
-					payloadPosition = i;
-				else if (Headers.class.equals(ann.annotationType()))
-					headerPosition = i;
-			}
-		}
-		return new ParamsPosition(payloadPosition, headerPosition);
-	}
-
-	private Object[] composeVarArgsParams(Method method, Message<?> message){
-		ParamsPosition parameterPosition = getParameterPosition(method.getParameterAnnotations());
-		Object[] params = new Object[2];
-		params[parameterPosition.getPayloadPosition()] = message.getPayload();
-		params[parameterPosition.getHeaderPosition()] = message.getHeaders();
-		return params;
-	}
-
-	@SuppressWarnings({"unchecked", "rawtypes"})
-	private Function<Message<?>, Mono<Void>> getFunctionListener(ReactorStreamListenerHandlerMethodMapping listener){
-		return message -> {
-			try {
-				return (Mono) listener.getMethod().invoke(listener.getTargetBean(), composeVarArgsParams(listener.getMethod(), message));
-			} catch (IllegalAccessException | InvocationTargetException ex) {
-				throw new RuntimeException(ex);
-			}
-		};
-	}
-
-	@SuppressWarnings({"rawtypes"})
-	private ReactorStreamDispatcher getReactorStreamDispatcher(Class clazz, String channel){
-		return this.applicationContext.getBean(channel, ReactorStreamDispatcher.class);
+			getReactorStreamDispatcher(clazz, mappedBindingEntry.getKey())
+					.listen(getFunctionListener(listener));
+		}*/
+		//this.mappedListenerMethods.clear();
 	}
 
 	@Override
 	public final Object postProcessAfterInitialization(Object bean, final String beanName) {
 		Class<?> targetClass = AopUtils.isAopProxy(bean) ? AopUtils.getTargetClass(bean)
 				: bean.getClass();
-		Method[] uniqueDeclaredMethods = ReflectionUtils.getUniqueDeclaredMethods(targetClass);
-		for (Method method : uniqueDeclaredMethods) {
-			ReactorStreamListener streamListener = AnnotatedElementUtils.findMergedAnnotation(method, ReactorStreamListener.class);
-			if (streamListener != null && !method.isBridge()) {
-				this.streamListenerPresent = true;
-				this.streamListenerCallbacks.add(() -> {
-					Assert.isTrue(method.getAnnotation(Input.class) == null, StreamListenerErrorMessages.INPUT_AT_STREAM_LISTENER);
-					this.doPostProcess(streamListener, method, bean);
-				});
-			}
+
+		if (Arrays.stream(targetClass.getDeclaredFields()).anyMatch(field -> field.isAnnotationPresent(ReactorMessageChannel.class))){
+			Arrays.stream(targetClass.getDeclaredFields()).filter(field -> field.isAnnotationPresent(ReactorMessageChannel.class))
+					.forEach(field -> {
+						try {
+							boolean isAccessible = field.canAccess(bean);
+							field.setAccessible(true);
+							field.set(bean, this.applicationContext.getBean(field.getAnnotation(ReactorMessageChannel.class).value()));
+							field.setAccessible(isAccessible);
+						} catch (IllegalAccessException e) {
+							throw new IllegalStateException(e);
+						}
+					});
 		}
+
 		return bean;
 	}
 
@@ -285,32 +211,38 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 	 * @return the postprocessed {@link ReactorStreamListener} annotation
 	 */
 	protected ReactorStreamListener postProcessAnnotation(ReactorStreamListener  originalAnnotation,
-			Method annotatedMethod) {
+														  Method annotatedMethod) {
 		return originalAnnotation;
 	}
 
 	private void doPostProcess(ReactorStreamListener reactorStreamListener, Method method,
-			Object bean) {
+							   Object bean) {
 		reactorStreamListener = postProcessAnnotation(reactorStreamListener, method);
 		Optional<ReactorStreamListenerSetupMethodOrchestrator> orchestratorOptional;
-		orchestratorOptional = this.streamListenerSetupMethodOrchestrators.stream().filter(t -> t.supports(method)).findFirst();
-		Assert.isTrue(orchestratorOptional.isPresent(),"A matching StreamListenerSetupMethodOrchestrator must be present");
-		ReactorStreamListenerSetupMethodOrchestrator streamListenerSetupMethodOrchestrator = orchestratorOptional.get();
-		streamListenerSetupMethodOrchestrator.orchestrateStreamListenerSetupMethod(reactorStreamListener, method, bean);
+		orchestratorOptional = this.streamListenerSetupMethodOrchestrators.stream()
+				.filter(t -> t.supports(method)).findFirst();
+		Assert.isTrue(orchestratorOptional.isPresent(),
+				"A matching StreamListenerSetupMethodOrchestrator must be present");
+		ReactorStreamListenerSetupMethodOrchestrator streamListenerSetupMethodOrchestrator = orchestratorOptional
+				.get();
+		streamListenerSetupMethodOrchestrator
+				.orchestrateStreamListenerSetupMethod(reactorStreamListener, method, bean);
 	}
 
 	private Method checkProxy(Method methodArg, Object bean) {
 		Method method = methodArg;
-		if (AopUtils.isJdkDynamicProxy(bean)) {
+		/*if (AopUtils.isJdkDynamicProxy(bean)) {
 			try {
 				// Found a @StreamListener method on the target class for this JDK proxy
 				// ->
 				// is it also present on the proxy itself?
-				method = bean.getClass().getMethod(method.getName(),method.getParameterTypes());
+				method = bean.getClass().getMethod(method.getName(),
+						method.getParameterTypes());
 				Class<?>[] proxiedInterfaces = ((Advised) bean).getProxiedInterfaces();
 				for (Class<?> iface : proxiedInterfaces) {
 					try {
-						method = iface.getMethod(method.getName(),method.getParameterTypes());
+						method = iface.getMethod(method.getName(),
+								method.getParameterTypes());
 						break;
 					}
 					catch (NoSuchMethodException noMethod) {
@@ -329,44 +261,8 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 						method.getName(), method.getDeclaringClass().getSimpleName()),
 						ex);
 			}
-		}
+		}*/
 		return method;
-	}
-
-	private String resolveExpressionAsString(String value, String property) {
-		Object resolved = resolveExpression(value);
-		if (resolved instanceof String) {
-			return (String) resolved;
-		}
-		else {
-			throw new IllegalStateException("Resolved " + property + " to ["
-					+ resolved.getClass() + "] instead of String for [" + value + "]");
-		}
-	}
-
-	private boolean resolveExpressionAsBoolean(String value, String property) {
-		Object resolved = resolveExpression(value);
-		if (resolved == null) {
-			return false;
-		}
-		else if (resolved instanceof String) {
-			return Boolean.parseBoolean((String) resolved);
-		}
-		else if (resolved instanceof Boolean) {
-			return (Boolean) resolved;
-		}
-		else {
-			throw new IllegalStateException("Resolved " + property + " to [" + resolved.getClass() + "] instead of String or Boolean for [" + value + "]");
-		}
-	}
-
-	private String resolveExpression(String value) {
-		String resolvedValue = this.applicationContext.getBeanFactory()
-				.resolveEmbeddedValue(value);
-		if (resolvedValue.startsWith("#{") && value.endsWith("}")) {
-			resolvedValue = (String) this.resolver.evaluate(resolvedValue,this.expressionContext);
-		}
-		return resolvedValue;
 	}
 
 	/**
@@ -375,24 +271,30 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private void injectAndPostProcessDependencies() {
-		Collection<StreamListenerParameterAdapter> streamListenerParameterAdapters = this.applicationContext.getBeansOfType(StreamListenerParameterAdapter.class).values();
-
-		Collection<StreamListenerResultAdapter> streamListenerResultAdapters = this.applicationContext.getBeansOfType(StreamListenerResultAdapter.class).values();
-
-		this.binderAwareChannelResolver = this.applicationContext.getBean("binderAwareChannelResolver", DestinationResolver.class);
-		this.messageHandlerMethodFactory = this.applicationContext.getBean(MessageHandlerMethodFactory.class);
-		this.springIntegrationProperties = this.applicationContext.getBean(SpringIntegrationProperties.class);
-
-		this.streamListenerSetupMethodOrchestrators.addAll(this.applicationContext.getBeansOfType(ReactorStreamListenerSetupMethodOrchestrator.class).values());
-
-		// Default orchestrator for StreamListener method invocation is added last into
-		// the LinkedHashSet.
-		this.streamListenerSetupMethodOrchestrators.add(new DefaultReactorStreamListenerSetupMethodOrchestrator(this.applicationContext, streamListenerParameterAdapters, streamListenerResultAdapters));
-
-		this.streamListenerCallbacks.forEach(Runnable::run);
+		Collection<StreamListenerParameterAdapter> streamListenerParameterAdapters = this.applicationContext
+				.getBeansOfType(StreamListenerParameterAdapter.class).values();
+		//Collection<StreamListenerResultAdapter> streamListenerResultAdapters = this.applicationContext
+		//		.getBeansOfType(StreamListenerResultAdapter.class).values();
+		//this.binderAwareChannelResolver = this.applicationContext
+		//		.getBean("binderAwareChannelResolver", DestinationResolver.class);
+		//this.messageHandlerMethodFactory = this.applicationContext
+		//		.getBean(MessageHandlerMethodFactory.class);
+		//this.springIntegrationProperties = this.applicationContext
+		//		.getBean(SpringIntegrationProperties.class);
+//
+		//this.streamListenerSetupMethodOrchestrators.addAll(this.applicationContext
+		//		.getBeansOfType(ReactorStreamListenerSetupMethodOrchestrator.class).values());
+//
+		//// Default orchestrator for StreamListener method invocation is added last into
+		//// the LinkedHashSet.
+		///*this.streamListenerSetupMethodOrchestrators.add(
+		//		new DefaultReactorStreamListenerSetupMethodOrchestrator(this.applicationContext,
+		//				streamListenerParameterAdapters, streamListenerResultAdapters));*/
+//
+		//this.streamListenerCallbacks.forEach(Runnable::run);
 	}
 
-	private class ReactorStreamListenerHandlerMethodMapping {
+	/*private class ReactorStreamListenerHandlerMethodMapping {
 
 		private final Object targetBean;
 
@@ -436,7 +338,8 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 	}
 
 	@SuppressWarnings("rawtypes")
-	private final class DefaultReactorStreamListenerSetupMethodOrchestrator implements ReactorStreamListenerSetupMethodOrchestrator {
+	private final class DefaultReactorStreamListenerSetupMethodOrchestrator
+			implements ReactorStreamListenerSetupMethodOrchestrator {
 
 		private final ConfigurableApplicationContext applicationContext;
 
@@ -454,22 +357,31 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		}
 
 		@Override
-		public void orchestrateStreamListenerSetupMethod(ReactorStreamListener streamListener, Method method, Object bean) {
+		public void orchestrateStreamListenerSetupMethod(ReactorStreamListener streamListener,
+				Method method, Object bean) {
 			String methodAnnotatedInboundName = streamListener.value();
 
-			String methodAnnotatedOutboundName = ReactorStreamListenerMethodUtils.getOutboundBindingTargetName(method);
-			int inputAnnotationCount = ReactorStreamListenerMethodUtils.inputAnnotationCount(method);
-			int outputAnnotationCount = ReactorStreamListenerMethodUtils.outputAnnotationCount(method);
-			boolean isDeclarative = checkDeclarativeMethod(method, methodAnnotatedInboundName, methodAnnotatedOutboundName);
-			ReactorStreamListenerMethodUtils.validateStreamListenerMethod(method, inputAnnotationCount, outputAnnotationCount,
-					methodAnnotatedInboundName, methodAnnotatedOutboundName, isDeclarative, streamListener.condition());
-
+			String methodAnnotatedOutboundName = ReactorStreamListenerMethodUtils
+					.getOutboundBindingTargetName(method);
+			int inputAnnotationCount = ReactorStreamListenerMethodUtils
+					.inputAnnotationCount(method);
+			int outputAnnotationCount = ReactorStreamListenerMethodUtils
+					.outputAnnotationCount(method);
+			boolean isDeclarative = checkDeclarativeMethod(method,
+					methodAnnotatedInboundName, methodAnnotatedOutboundName);
+			ReactorStreamListenerMethodUtils.validateStreamListenerMethod(method,
+					inputAnnotationCount, outputAnnotationCount,
+					methodAnnotatedInboundName, methodAnnotatedOutboundName,
+					isDeclarative, streamListener.condition());
 			if (isDeclarative) {
 				StreamListenerParameterAdapter[] toSlpaArray;
 				toSlpaArray = new StreamListenerParameterAdapter[this.streamListenerParameterAdapters
 						.size()];
-				Object[] adaptedInboundArguments = adaptAndRetrieveInboundArguments(method, methodAnnotatedInboundName, this.applicationContext,this.streamListenerParameterAdapters.toArray(toSlpaArray));
-				invokeReactorStreamListenerResultAdapter(method, bean,methodAnnotatedOutboundName, adaptedInboundArguments);
+				Object[] adaptedInboundArguments = adaptAndRetrieveInboundArguments(
+						method, methodAnnotatedInboundName, this.applicationContext,
+						this.streamListenerParameterAdapters.toArray(toSlpaArray));
+				invokeReactorStreamListenerResultAdapter(method, bean,
+						methodAnnotatedOutboundName, adaptedInboundArguments);
 			}
 			else {
 				registerHandlerMethodOnListenedChannel(method, streamListener, bean);
@@ -504,7 +416,8 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 					}
 					Object targetBean = this.applicationContext.getBean(outboundName);
 					for (StreamListenerResultAdapter streamListenerResultAdapter : this.streamListenerResultAdapters) {
-						if (streamListenerResultAdapter.supports(result.getClass(),targetBean.getClass())) {
+						if (streamListenerResultAdapter.supports(result.getClass(),
+								targetBean.getClass())) {
 							streamListenerResultAdapter.adapt(result, targetBean);
 							break;
 						}
@@ -535,7 +448,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 						"An output channel must be specified for a method that can return a value");
 			}
 			ReactorStreamListenerMethodUtils.validateStreamListenerMessageHandler(method);
-			ReactorStreamListenerAnnotationBeanPostProcessor.this.mappedListenerMethods.add(
+			ReactorChannelBinderAnnotationBeanPostProcessor.this.mappedListenerMethods.add(
 					streamListener.value(),
 					new ReactorStreamListenerHandlerMethodMapping(bean, method,
 							streamListener.condition(), defaultOutputChannel,
@@ -580,20 +493,20 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			return false;
 		}
 
-		/**
-		 * Determines if method parameters signify an imperative or declarative listener
-		 * definition. <br>
-		 * Imperative - where handler method is invoked on each message by the handler
-		 * infrastructure provided by the framework <br>
-		 * Declarative - where handler is provided by the method itself. <br>
-		 * Declarative method parameter could either be {@link MessageChannel} or any
-		 * other Object for which there is a {@link StreamListenerParameterAdapter} (i.e.,
-		 * {@link reactor.core.publisher.Flux}). Declarative method is invoked only once
-		 * during initialization phase.
-		 * @param targetBeanName name of the bean
-		 * @param methodParameter method parameter
-		 * @return {@code true} when the method parameter is declarative
-		 */
+		*//**
+	 * Determines if method parameters signify an imperative or declarative listener
+	 * definition. <br>
+	 * Imperative - where handler method is invoked on each message by the handler
+	 * infrastructure provided by the framework <br>
+	 * Declarative - where handler is provided by the method itself. <br>
+	 * Declarative method parameter could either be {@link MessageChannel} or any
+	 * other Object for which there is a {@link StreamListenerParameterAdapter} (i.e.,
+	 * {@link reactor.core.publisher.Flux}). Declarative method is invoked only once
+	 * during initialization phase.
+	 * @param targetBeanName name of the bean
+	 * @param methodParameter method parameter
+	 * @return {@code true} when the method parameter is declarative
+	 *//*
 		@SuppressWarnings("unchecked")
 		private boolean isDeclarativeMethodParameter(String targetBeanName,
 				MethodParameter methodParameter) {
@@ -612,6 +525,6 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			return declarative;
 		}
 
-	}
+	}*/
 
 }
