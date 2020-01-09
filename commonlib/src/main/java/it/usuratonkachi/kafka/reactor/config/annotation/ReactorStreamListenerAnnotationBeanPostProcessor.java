@@ -20,12 +20,12 @@ import it.usuratonkachi.kafka.reactor.config.ReactorKafkaProperties;
 import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.aop.framework.Advised;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.beans.factory.SmartInitializingSingleton;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -56,8 +56,6 @@ import org.springframework.messaging.handler.invocation.InvocableHandlerMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.*;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
@@ -73,8 +71,11 @@ import java.util.function.Function;
  *
  */
 @Component
+@RequiredArgsConstructor
 public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPostProcessor,
 		ApplicationContextAware, SmartInitializingSingleton {
+
+	private final ReactorKafkaProperties reactorKafkaProperties;
 
 	private static final SpelExpressionParser SPEL_EXPRESSION_PARSER = new SpelExpressionParser();
 
@@ -213,7 +214,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 	}
 
 	@AllArgsConstructor
-	private class ParamsPosition {
+	private static class ParamsPosition {
 		@Getter
 		private int payloadPosition;
 		@Getter
@@ -243,7 +244,6 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		return params;
 	}
 
-
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	private Function<Message<?>, Mono<Void>> getFunctionListener(StreamListenerHandlerMethodMapping listener){
 		return message -> {
@@ -254,9 +254,6 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			}
 		};
 	}
-
-	@Autowired
-	protected ReactorKafkaProperties reactorKafkaProperties;
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	private ReactorStreamDispatcher getReactorStreamDispatcher(Class clazz, String channel){
@@ -271,8 +268,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		Method[] uniqueDeclaredMethods = ReflectionUtils
 				.getUniqueDeclaredMethods(targetClass);
 		for (Method method : uniqueDeclaredMethods) {
-			ReactorStreamListener streamListener = AnnotatedElementUtils
-					.findMergedAnnotation(method, ReactorStreamListener.class);
+			ReactorStreamListener streamListener = AnnotatedElementUtils.findMergedAnnotation(method, ReactorStreamListener.class);
 			if (streamListener != null && !method.isBridge()) {
 				this.streamListenerPresent = true;
 				this.streamListenerCallbacks.add(() -> {

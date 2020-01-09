@@ -48,7 +48,7 @@ public class ReactorProducer implements CommandLineRunner {
 
 	AtomicInteger base = new AtomicInteger(0);
 
-	private Flux<Disposable> sendMail(Integer count, Integer baseCount){
+	private Flux<Boolean> sendMail(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -64,10 +64,10 @@ public class ReactorProducer implements CommandLineRunner {
 						.build()
 				)
 				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
-				.map(mailDispatcher::send);
+				.map(m -> mailDispatcher.send(m));
 	}
 
-	private Flux<Disposable> sendMessage(Integer count, Integer baseCount){
+	private Flux<Boolean> sendMessage(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -86,7 +86,7 @@ public class ReactorProducer implements CommandLineRunner {
 				.map(messageDispatcher::send);
 	}
 
-	private Flux<Disposable> sendMms(Integer count, Integer baseCount){
+	private Flux<Boolean> sendMms(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())
@@ -105,7 +105,7 @@ public class ReactorProducer implements CommandLineRunner {
 				.map(mmsDispatcher::send);
 	}
 
-	private Flux<Disposable> sendSms(Integer count, Integer baseCount){
+	private Flux<Boolean> sendSms(Integer count, Integer baseCount){
 		int start = baseCount;
 		int end = count + baseCount;
 		return Flux.fromStream(IntStream.range(start, end).boxed())

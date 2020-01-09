@@ -9,7 +9,4 @@ public interface Streams {
 	String MMS_CHANNEL_INPUT = "mms-kafka-in";
 	String SMS_CHANNEL_INPUT = "sms-kafka-in";
 
-	//@Input(MAIL_CHANNEL_INPUT)
-	//SubscribableChannel inboundMailKafka();
-
 }

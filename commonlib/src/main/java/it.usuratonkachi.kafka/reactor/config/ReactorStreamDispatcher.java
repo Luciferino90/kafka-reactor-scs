@@ -8,9 +8,9 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.support.GenericMessage;
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.ReceiverRecord;
@@ -180,8 +180,9 @@ public class ReactorStreamDispatcher<T> {
 	 * @param message
 	 * @return
 	 */
-	public Disposable send(Message<T> message){
-		return sendAsync(message).subscribe();
+	public boolean send(Message<?> message/*, long timeout*/){
+		sendAsync(message).subscribe();
+		return true;
 	}
 
 	/**
@@ -189,7 +190,7 @@ public class ReactorStreamDispatcher<T> {
 	 * @param message
 	 * @return
 	 */
-	private Flux<SenderResult<Object>> sendAsync(Message<T> message) {
+	private Flux<SenderResult<Object>> sendAsync(Message<?> message) {
 		if (reactorKafkaConfiguration.getProducer() != null) {
 			return internalSend(message);
 		} else {
@@ -206,7 +207,7 @@ public class ReactorStreamDispatcher<T> {
 	 * @param message
 	 * @return
 	 */
-	private Flux<SenderResult<Object>> internalSend(Message<T> message){
+	private Flux<SenderResult<Object>> internalSend(Message<?> message){
 		ProducerRecord<byte[], byte[]> producer = messageToProducerRecord(message);
 		SenderRecord<byte[], byte[], Object> senderRecord = SenderRecord.create(producer, null);
 		Flux<SenderRecord<byte[], byte[], Object>> messageSource = Flux.from(Mono.defer(() -> Mono.just(senderRecord)));
@@ -218,7 +219,7 @@ public class ReactorStreamDispatcher<T> {
 	 * @param message
 	 * @return
 	 */
-	private ProducerRecord<byte[], byte[]> messageToProducerRecord(Message<T> message){
+	private ProducerRecord<byte[], byte[]> messageToProducerRecord(Message<?> message){
 		try {
 			byte[] payload = objectMapper.writeValueAsBytes(message.getPayload());
 			Iterable<Header> headers = headersToProducerRecordHeaders(message);
@@ -233,7 +234,7 @@ public class ReactorStreamDispatcher<T> {
 	 * @param message
 	 * @return
 	 */
-	private Iterable<Header> headersToProducerRecordHeaders(Message<T> message){
+	private Iterable<Header> headersToProducerRecordHeaders(Message<?> message){
 		return message.getHeaders().entrySet().stream()
 				.filter(entryHeader -> entryHeader.getValue() instanceof Serializable)
 				.map(entryHeader -> {
