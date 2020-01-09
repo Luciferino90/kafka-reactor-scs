@@ -1,27 +1,33 @@
 package it.usuratonkachi.kafka.reactor.streamconfig;
 
-import org.springframework.cloud.stream.annotation.Output;
+import it.usuratonkachi.kafka.dto.Mail;
+import it.usuratonkachi.kafka.dto.Message;
+import it.usuratonkachi.kafka.dto.Mms;
+import it.usuratonkachi.kafka.dto.Sms;
+import it.usuratonkachi.kafka.reactor.config.binder.ReactorChannelBinder;
+import it.usuratonkachi.kafka.reactor.config.binder.ReactorChannel;
 import org.springframework.messaging.MessageChannel;
 
 /**
  */
-public interface Streams {
+@ReactorChannelBinder
+public class Streams {
 
-	String MAIL_CHANNEL_OUTPUT = "mail-kafka-out";
-	String MESSAGE_CHANNEL_OUTPUT = "message-kafka-out";
-	String MMS_CHANNEL_OUTPUT = "mms-kafka-out";
-	String SMS_CHANNEL_OUTPUT = "sms-kafka-out";
+	public final static String MAIL_CHANNEL_OUTPUT = "mail-kafka-out";
+	public final static String MESSAGE_CHANNEL_OUTPUT = "message-kafka-out";
+	public final static String MMS_CHANNEL_OUTPUT = "mms-kafka-out";
+	public final static String SMS_CHANNEL_OUTPUT = "sms-kafka-out";
 
-	@Output(MAIL_CHANNEL_OUTPUT)
-	MessageChannel outboundMailKafka();
+	@ReactorChannel(value = MAIL_CHANNEL_OUTPUT, messageType = Mail.class)
+	MessageChannel outboundMailKafka;
 
-	@Output(MESSAGE_CHANNEL_OUTPUT)
-	MessageChannel outboundMessageKafka();
+	@ReactorChannel(value = MESSAGE_CHANNEL_OUTPUT, messageType = Message.class)
+	MessageChannel outboundMessageKafka;
 
-	@Output(MMS_CHANNEL_OUTPUT)
-	MessageChannel outboundMmsKafka();
+	@ReactorChannel(value = MMS_CHANNEL_OUTPUT, messageType = Mms.class)
+	MessageChannel outboundMmsKafka;
 
-	@Output(SMS_CHANNEL_OUTPUT)
-	MessageChannel outboundSmsKafka();
+	@ReactorChannel(value = SMS_CHANNEL_OUTPUT, messageType = Sms.class)
+	MessageChannel outboundSmsKafka;
 
 }

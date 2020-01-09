@@ -7,7 +7,9 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
+import org.springframework.core.GenericTypeResolver;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.support.GenericMessage;
 import reactor.core.publisher.Flux;
@@ -19,6 +21,7 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
 import java.io.Serializable;
+import java.lang.reflect.ParameterizedType;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +37,7 @@ import java.util.stream.StreamSupport;
  * @param <T> Tipo di messaggio che si invia e si riceve attraverso questo topic
  */
 @Slf4j
-public class ReactorStreamDispatcher<T> {
+public class ReactorStreamDispatcher<T> implements MessageChannel {
 
 	private final ReactorKafkaConfiguration reactorKafkaConfiguration;
 
@@ -179,7 +182,7 @@ public class ReactorStreamDispatcher<T> {
 	 * @param message
 	 * @return
 	 */
-	public boolean send(Message<?> message/*, long timeout*/){
+	public boolean send(Message<?> message, long timeout){
 		sendAsync(message).subscribe();
 		return true;
 	}
@@ -332,6 +335,7 @@ public class ReactorStreamDispatcher<T> {
 				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
 	}
 
+	@SuppressWarnings("unchecked")
 	private T deserializeObject(byte[] serialized){
 		return deserializeObject(serialized, clazz);
 	}
