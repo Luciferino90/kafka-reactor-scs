@@ -131,73 +131,10 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 			return;
 		}
 		this.injectAndPostProcessDependencies();
-		EvaluationContext evaluationContext = IntegrationContextUtils
-				.getEvaluationContext(this.applicationContext.getBeanFactory());
-		for (Map.Entry<String, List<ReactorStreamListenerHandlerMethodMapping>> mappedBindingEntry : this.mappedListenerMethods
-				.entrySet()) {
-			ArrayList<DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper> handlers;
-			handlers = new ArrayList<>();
-			for (ReactorStreamListenerHandlerMethodMapping mapping : mappedBindingEntry
-					.getValue()) {
-				final InvocableHandlerMethod invocableHandlerMethod = this.messageHandlerMethodFactory
-						.createInvocableHandlerMethod(mapping.getTargetBean(),
-								checkProxy(mapping.getMethod(), mapping.getTargetBean()));
-				ReactorStreamListenerMessageHandler streamListenerMessageHandler = new ReactorStreamListenerMessageHandler(
-						invocableHandlerMethod,
-						resolveExpressionAsBoolean(mapping.getCopyHeaders(),
-								"copyHeaders"),
-						this.springIntegrationProperties
-								.getMessageHandlerNotPropagatedHeaders());
-				streamListenerMessageHandler
-						.setApplicationContext(this.applicationContext);
-				streamListenerMessageHandler
-						.setBeanFactory(this.applicationContext.getBeanFactory());
-				if (StringUtils.hasText(mapping.getDefaultOutputChannel())) {
-					streamListenerMessageHandler
-							.setOutputChannelName(mapping.getDefaultOutputChannel());
-				}
-				streamListenerMessageHandler.afterPropertiesSet();
-				if (StringUtils.hasText(mapping.getCondition())) {
-					String conditionAsString = resolveExpressionAsString(
-							mapping.getCondition(), "condition");
-					Expression condition = SPEL_EXPRESSION_PARSER
-							.parseExpression(conditionAsString);
-					handlers.add(
-							new DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper(
-									condition, streamListenerMessageHandler));
-				}
-				else {
-					handlers.add(
-							new DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper(
-									null, streamListenerMessageHandler));
-				}
-			}
-			if (handlers.size() > 1) {
-				for (DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper handler : handlers) {
-					Assert.isTrue(handler.isVoid(),
-							StreamListenerErrorMessages.MULTIPLE_VALUE_RETURNING_METHODS);
-				}
-			}
-			AbstractReplyProducingMessageHandler handler;
-
-			if (handlers.size() > 1 || handlers.get(0).getCondition() != null) {
-				handler = new DispatchingReactorStreamListenerMessageHandler(handlers,
-						evaluationContext);
-			}
-			else {
-				handler = handlers.get(0).getStreamListenerMessageHandler();
-			}
-			handler.setApplicationContext(this.applicationContext);
-			handler.setChannelResolver(this.binderAwareChannelResolver);
-			handler.afterPropertiesSet();
-			this.applicationContext.getBeanFactory().registerSingleton(handler.getClass().getSimpleName() + handler.hashCode(), handler);
-
+		for (Map.Entry<String, List<ReactorStreamListenerHandlerMethodMapping>> mappedBindingEntry : this.mappedListenerMethods.entrySet()) {
 			ReactorStreamListenerHandlerMethodMapping listener = this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey());
-
 			if (listener == null || listener.getMethod() == null) throw new RuntimeException("Cannot find method " + mappedBindingEntry.getKey());
-
 			Class<?> clazz = getPayloadType(listener.getMethod());
-
 			getReactorStreamDispatcher(clazz, mappedBindingEntry.getKey()).listen(getFunctionListener(listener));
 		}
 		this.mappedListenerMethods.clear();
@@ -299,76 +236,6 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		streamListenerSetupMethodOrchestrator.orchestrateStreamListenerSetupMethod(reactorStreamListener, method, bean);
 	}
 
-	private Method checkProxy(Method methodArg, Object bean) {
-		Method method = methodArg;
-		if (AopUtils.isJdkDynamicProxy(bean)) {
-			try {
-				// Found a @StreamListener method on the target class for this JDK proxy
-				// ->
-				// is it also present on the proxy itself?
-				method = bean.getClass().getMethod(method.getName(),method.getParameterTypes());
-				Class<?>[] proxiedInterfaces = ((Advised) bean).getProxiedInterfaces();
-				for (Class<?> iface : proxiedInterfaces) {
-					try {
-						method = iface.getMethod(method.getName(),method.getParameterTypes());
-						break;
-					}
-					catch (NoSuchMethodException noMethod) {
-					}
-				}
-			}
-			catch (SecurityException ex) {
-				ReflectionUtils.handleReflectionException(ex);
-			}
-			catch (NoSuchMethodException ex) {
-				throw new IllegalStateException(String.format(
-						"@StreamListener method '%s' found on bean target class '%s', "
-								+ "but not found in any interface(s) for bean JDK proxy. Either "
-								+ "pull the method up to an interface or switch to subclass (CGLIB) "
-								+ "proxies by setting proxy-target-class/proxyTargetClass attribute to 'true'",
-						method.getName(), method.getDeclaringClass().getSimpleName()),
-						ex);
-			}
-		}
-		return method;
-	}
-
-	private String resolveExpressionAsString(String value, String property) {
-		Object resolved = resolveExpression(value);
-		if (resolved instanceof String) {
-			return (String) resolved;
-		}
-		else {
-			throw new IllegalStateException("Resolved " + property + " to ["
-					+ resolved.getClass() + "] instead of String for [" + value + "]");
-		}
-	}
-
-	private boolean resolveExpressionAsBoolean(String value, String property) {
-		Object resolved = resolveExpression(value);
-		if (resolved == null) {
-			return false;
-		}
-		else if (resolved instanceof String) {
-			return Boolean.parseBoolean((String) resolved);
-		}
-		else if (resolved instanceof Boolean) {
-			return (Boolean) resolved;
-		}
-		else {
-			throw new IllegalStateException("Resolved " + property + " to [" + resolved.getClass() + "] instead of String or Boolean for [" + value + "]");
-		}
-	}
-
-	private String resolveExpression(String value) {
-		String resolvedValue = this.applicationContext.getBeanFactory()
-				.resolveEmbeddedValue(value);
-		if (resolvedValue.startsWith("#{") && value.endsWith("}")) {
-			resolvedValue = (String) this.resolver.evaluate(resolvedValue,this.expressionContext);
-		}
-		return resolvedValue;
-	}
-
 	/**
 	 * This operations ensures that required dependencies are not accidentally injected
 	 * early given that this bean is BPP.
@@ -385,8 +252,6 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 
 		this.streamListenerSetupMethodOrchestrators.addAll(this.applicationContext.getBeansOfType(ReactorStreamListenerSetupMethodOrchestrator.class).values());
 
-		// Default orchestrator for StreamListener method invocation is added last into
-		// the LinkedHashSet.
 		this.streamListenerSetupMethodOrchestrators.add(new DefaultReactorStreamListenerSetupMethodOrchestrator(this.applicationContext, streamListenerParameterAdapters, streamListenerResultAdapters));
 
 		this.streamListenerCallbacks.forEach(Runnable::run);
