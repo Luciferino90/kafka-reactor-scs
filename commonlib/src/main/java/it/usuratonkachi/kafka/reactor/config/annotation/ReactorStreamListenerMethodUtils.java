@@ -18,7 +18,6 @@ package it.usuratonkachi.kafka.reactor.config.annotation;
 
 import org.springframework.cloud.stream.annotation.Input;
 import org.springframework.cloud.stream.annotation.Output;
-import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.cloud.stream.binding.StreamListenerErrorMessages;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -27,18 +26,19 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 
 /**
- * This class contains utility methods for handling {@link StreamListener} annotated bean
+ * This class contains utility methods for handling {@link ReactorStreamListener} annotated bean
  * methods.
  *
- * @author Ilayaperumal Gopinathan
+ * @see org.springframework.cloud.stream.binding.StreamListenerMethodUtils
  */
-public final class StreamListenerMethodUtils {
+public final class ReactorStreamListenerMethodUtils {
 
-	private StreamListenerMethodUtils() {
+	private ReactorStreamListenerMethodUtils() {
 		throw new IllegalStateException("Can't instantiate a utility class");
 	}
 
@@ -96,7 +96,7 @@ public final class StreamListenerMethodUtils {
 			Assert.isTrue(outputAnnotationCount == 0,
 					StreamListenerErrorMessages.INVALID_OUTPUT_VALUES);
 		}
-		if (!Void.TYPE.equals(method.getReturnType())) {
+		if (!Mono.class.equals(method.getReturnType())) {
 			Assert.isTrue(!StringUtils.hasText(condition),
 					StreamListenerErrorMessages.CONDITION_ON_METHOD_RETURNING_VALUE);
 		}
@@ -127,7 +127,7 @@ public final class StreamListenerMethodUtils {
 			}
 		}
 
-		if (!method.getReturnType().equals(Void.TYPE)) {
+		if (!method.getReturnType().equals(Mono.class)) {
 			if (!StringUtils.hasText(methodAnnotatedOutboundName)) {
 				if (outputAnnotationCount == 0) {
 					throw new IllegalArgumentException(

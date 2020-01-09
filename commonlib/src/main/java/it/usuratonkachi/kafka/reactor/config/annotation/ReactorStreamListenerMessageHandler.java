@@ -20,19 +20,18 @@ import org.springframework.integration.handler.AbstractReplyProducingMessageHand
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.handler.invocation.InvocableHandlerMethod;
+import reactor.core.publisher.Mono;
 
 /**
- * @author Marius Bogoevici
- * @author Gary Russell
- * @since 1.2
+ * @see org.springframework.cloud.stream.binding.StreamListenerMessageHandler
  */
-public class StreamListenerMessageHandler extends AbstractReplyProducingMessageHandler {
+public class ReactorStreamListenerMessageHandler extends AbstractReplyProducingMessageHandler {
 
 	private final InvocableHandlerMethod invocableHandlerMethod;
 
 	private final boolean copyHeaders;
 
-	StreamListenerMessageHandler(InvocableHandlerMethod invocableHandlerMethod,
+	ReactorStreamListenerMessageHandler(InvocableHandlerMethod invocableHandlerMethod,
                                  boolean copyHeaders, String[] notPropagatedHeaders) {
 		super();
 		this.invocableHandlerMethod = invocableHandlerMethod;
@@ -46,7 +45,7 @@ public class StreamListenerMessageHandler extends AbstractReplyProducingMessageH
 	}
 
 	public boolean isVoid() {
-		return this.invocableHandlerMethod.isVoid();
+		return this.invocableHandlerMethod.getReturnType().getParameterType().equals(Mono.class);
 	}
 
 	@Override

@@ -5,20 +5,18 @@ import it.usuratonkachi.kafka.dto.Mail;
 import it.usuratonkachi.kafka.dto.Message;
 import it.usuratonkachi.kafka.dto.Mms;
 import it.usuratonkachi.kafka.dto.Sms;
-import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
+import it.usuratonkachi.kafka.reactor.config.annotation.ReactorStreamListener;
+import it.usuratonkachi.kafka.reactor.streamconfig.Streams;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationStartedEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.messaging.MessageHeaders;
+import org.springframework.messaging.handler.annotation.Headers;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.util.function.Function;
+import java.util.Map;
 
 @Component
 @Slf4j
@@ -31,74 +29,35 @@ public class ReactorConsumer {
 	//@Value("${default.waittime:10000}")
 	private Long waittime = 0L;
 
-	private final ReactorStreamDispatcher<Mail> mailDispatcher;
-	private final ReactorStreamDispatcher<Message> messageDispatcher;
-	private final ReactorStreamDispatcher<Mms> mmsDispatcher;
-	private final ReactorStreamDispatcher<Sms> smsDispatcher;
-
 	@Autowired
 	private KafkaService kafkaService;
 
-	Function<org.springframework.messaging.Message<Mail>, Mono<Void>> mailListener = kafkaMessage ->
-			Mono.just(kafkaMessage)
-					.doOnNext(e -> System.out.println("Start: " + kafkaMessage.getPayload().getMsgNum()))
-					.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
-					.map(msg -> {
-						Mail payload = kafkaMessage.getPayload();
-						MessageHeaders headers = kafkaMessage.getHeaders();
-						kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
-						return "";
-					})
-					.doOnNext(e -> System.out.println("Ending: " + kafkaMessage.getPayload().getMsgNum()))
-					.flatMap(e -> Mono.empty());
-
-	Function<org.springframework.messaging.Message<Message>, Mono<Void>> messageListener = kafkaMessage ->
-			Mono.just(kafkaMessage)
-					.doOnNext(e -> System.out.println("Start: " + kafkaMessage.getPayload().getMsgNum()))
-					.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
-					.map(msg -> {
-						Message payload = kafkaMessage.getPayload();
-						MessageHeaders headers = kafkaMessage.getHeaders();
-						kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
-						return "";
-					})
-					.doOnNext(e -> System.out.println("Ending: " + kafkaMessage.getPayload().getMsgNum()))
-					.flatMap(e -> Mono.empty());
-
-	Function<org.springframework.messaging.Message<Mms>, Mono<Void>> mmsListener = kafkaMessage ->
-		Mono.just(kafkaMessage)
-				.doOnNext(e -> System.out.println("Start: " + kafkaMessage.getPayload().getMsgNum()))
-				.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
-				.map(msg -> {
-					Mms payload = kafkaMessage.getPayload();
-					MessageHeaders headers = kafkaMessage.getHeaders();
-					kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
-					return "";
-				})
-				.doOnNext(e -> System.out.println("Ending: " + kafkaMessage.getPayload().getMsgNum()))
+	@ReactorStreamListener(Streams.MAIL_CHANNEL_INPUT)
+	public Mono<Void> mailListener(@Payload Mail mail, @Headers Map<String, Object> headers){
+		return Mono.just(mail)
+				.doOnNext(m -> kafkaService.ackIfNotYetLogOtherwise(m.getMsgNum(), m.getProducer(), m.getClass().getSimpleName()))
 				.flatMap(e -> Mono.empty());
+	}
 
-	Function<org.springframework.messaging.Message<Sms>, Mono<Void>> smsListener = kafkaMessage ->
-		Mono.just(kafkaMessage)
-				.doOnNext(e -> System.out.println("Start: " + kafkaMessage.getPayload().getMsgNum()))
-				.delayElement(Duration.of(waittime, ChronoUnit.MILLIS))
-				.map(msg -> {
-					Sms payload = kafkaMessage.getPayload();
-					MessageHeaders headers = kafkaMessage.getHeaders();
-					kafkaService.ackIfNotYetLogOtherwise(payload.getMsgNum(), payload.getProducer(), payload.getClass().getSimpleName());
-					return "";
-				})
-				.doOnNext(e -> System.out.println("Ending: " + kafkaMessage.getPayload().getMsgNum()))
+	@ReactorStreamListener(Streams.MESSAGE_CHANNEL_INPUT)
+	public Mono<Void> mailListener(@Payload Message message, @Headers Map<String, Object> headers){
+		return Mono.just(message)
+				.doOnNext(m -> kafkaService.ackIfNotYetLogOtherwise(m.getMsgNum(), m.getProducer(), m.getClass().getSimpleName()))
 				.flatMap(e -> Mono.empty());
+	}
 
-	@EventListener(ApplicationStartedEvent.class)
-	public void onMessages() {
-		// Spring call ApplicationStartedEvent twice, first for the class, second for its proxy.
-		mailDispatcher.listen(mailListener);
-		messageDispatcher.listen(messageListener);
-		mmsDispatcher.listen(mmsListener);
-		smsDispatcher.listen(smsListener);
-		log.info("All listeners up");
+	@ReactorStreamListener(Streams.SMS_CHANNEL_INPUT)
+	public Mono<Void> mailListener(@Payload Sms sms, @Headers Map<String, Object> headers){
+		return Mono.just(sms)
+				.doOnNext(m -> kafkaService.ackIfNotYetLogOtherwise(m.getMsgNum(), m.getProducer(), m.getClass().getSimpleName()))
+				.flatMap(e -> Mono.empty());
+	}
+
+	@ReactorStreamListener(Streams.MMS_CHANNEL_INPUT)
+	public Mono<Void> mailListener(@Payload Mms mms, @Headers Map<String, Object> headers){
+		return Mono.just(mms)
+				.doOnNext(m -> kafkaService.ackIfNotYetLogOtherwise(m.getMsgNum(), m.getProducer(), m.getClass().getSimpleName()))
+				.flatMap(e -> Mono.empty());
 	}
 
 }

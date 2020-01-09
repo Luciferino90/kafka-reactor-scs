@@ -138,9 +138,9 @@ public class ReactorProducer implements CommandLineRunner {
 				.doOnNext(i -> {
 					int basecount = base.getAndIncrement();
 					sendMail(count, basecount).subscribe();
-					//sendMessage(count, basecount).subscribe();
-					//sendMms(count, basecount).subscribe();
-					//sendSms(count, basecount).subscribe();
+					sendMessage(count, basecount).subscribe();
+					sendMms(count, basecount).subscribe();
+					sendSms(count, basecount).subscribe();
 				})
 				.collectList()
 				.block();

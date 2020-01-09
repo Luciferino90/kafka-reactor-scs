@@ -16,18 +16,22 @@
 
 package it.usuratonkachi.kafka.reactor.config.annotation;
 
+import it.usuratonkachi.kafka.reactor.config.ReactorKafkaProperties;
+import it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher;
 import org.springframework.aop.framework.Advised;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.cloud.stream.annotation.Input;
 import org.springframework.cloud.stream.annotation.Output;
-import org.springframework.cloud.stream.annotation.StreamListener;
-import org.springframework.cloud.stream.binding.*;
+import org.springframework.cloud.stream.binding.StreamListenerErrorMessages;
+import org.springframework.cloud.stream.binding.StreamListenerParameterAdapter;
+import org.springframework.cloud.stream.binding.StreamListenerResultAdapter;
 import org.springframework.cloud.stream.config.SpringIntegrationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -40,27 +44,29 @@ import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.integration.context.IntegrationContextUtils;
 import org.springframework.integration.handler.AbstractReplyProducingMessageHandler;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.core.DestinationResolver;
 import org.springframework.messaging.handler.annotation.support.MessageHandlerMethodFactory;
 import org.springframework.messaging.handler.invocation.InvocableHandlerMethod;
+import org.springframework.stereotype.Component;
 import org.springframework.util.*;
+import reactor.core.publisher.Mono;
 
-import javax.annotation.PostConstruct;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.function.Function;
 
 /**
- * {@link BeanPostProcessor} that handles {@link StreamListener} annotations found on bean
+ * {@link BeanPostProcessor} that handles {@link ReactorStreamListener} annotations found on bean
  * methods.
  *
- * @author Marius Bogoevici
- * @author Ilayaperumal Gopinathan
- * @author Soby Chacko
- * @author Oleg Zhurakousky
+ * @see org.springframework.cloud.stream.binding.StreamListenerAnnotationBeanPostProcessor
+ *
  */
-public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProcessor,
+@Component
+public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPostProcessor,
 		ApplicationContextAware, SmartInitializingSingleton {
 
 	private static final SpelExpressionParser SPEL_EXPRESSION_PARSER = new SpelExpressionParser();
@@ -87,7 +93,7 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 
 	private BeanExpressionContext expressionContext;
 
-	private Set<StreamListenerSetupMethodOrchestrator> streamListenerSetupMethodOrchestrators = new LinkedHashSet<>();
+	private Set<ReactorStreamListenerSetupMethodOrchestrator> streamListenerSetupMethodOrchestrators = new LinkedHashSet<>();
 
 	private boolean streamListenerPresent;
 
@@ -102,6 +108,7 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 	}
 
 	@Override
+	@SuppressWarnings({"unchecked"})
 	public final void afterSingletonsInstantiated() {
 		if (!this.streamListenerPresent) {
 			return;
@@ -111,14 +118,14 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 				.getEvaluationContext(this.applicationContext.getBeanFactory());
 		for (Map.Entry<String, List<StreamListenerHandlerMethodMapping>> mappedBindingEntry : this.mappedListenerMethods
 				.entrySet()) {
-			ArrayList<DispatchingStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper> handlers;
+			ArrayList<DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper> handlers;
 			handlers = new ArrayList<>();
 			for (StreamListenerHandlerMethodMapping mapping : mappedBindingEntry
 					.getValue()) {
 				final InvocableHandlerMethod invocableHandlerMethod = this.messageHandlerMethodFactory
 						.createInvocableHandlerMethod(mapping.getTargetBean(),
 								checkProxy(mapping.getMethod(), mapping.getTargetBean()));
-				StreamListenerMessageHandler streamListenerMessageHandler = new StreamListenerMessageHandler(
+				ReactorStreamListenerMessageHandler streamListenerMessageHandler = new ReactorStreamListenerMessageHandler(
 						invocableHandlerMethod,
 						resolveExpressionAsBoolean(mapping.getCopyHeaders(),
 								"copyHeaders"),
@@ -139,17 +146,17 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 					Expression condition = SPEL_EXPRESSION_PARSER
 							.parseExpression(conditionAsString);
 					handlers.add(
-							new DispatchingStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper(
+							new DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper(
 									condition, streamListenerMessageHandler));
 				}
 				else {
 					handlers.add(
-							new DispatchingStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper(
+							new DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper(
 									null, streamListenerMessageHandler));
 				}
 			}
 			if (handlers.size() > 1) {
-				for (DispatchingStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper handler : handlers) {
+				for (DispatchingReactorStreamListenerMessageHandler.ConditionalStreamListenerMessageHandlerWrapper handler : handlers) {
 					Assert.isTrue(handler.isVoid(),
 							StreamListenerErrorMessages.MULTIPLE_VALUE_RETURNING_METHODS);
 				}
@@ -157,7 +164,7 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 			AbstractReplyProducingMessageHandler handler;
 
 			if (handlers.size() > 1 || handlers.get(0).getCondition() != null) {
-				handler = new DispatchingStreamListenerMessageHandler(handlers,
+				handler = new DispatchingReactorStreamListenerMessageHandler(handlers,
 						evaluationContext);
 			}
 			else {
@@ -168,11 +175,33 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 			handler.afterPropertiesSet();
 			this.applicationContext.getBeanFactory().registerSingleton(
 					handler.getClass().getSimpleName() + handler.hashCode(), handler);
-			this.applicationContext
-					.getBean(mappedBindingEntry.getKey(), SubscribableChannel.class)
-					.subscribe(handler);
+			Class<?> clazz = Objects.requireNonNull(this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey())).getMethod().getParameterTypes()[0];
+			getReactorStreamDispatcher(clazz, mappedBindingEntry.getKey())
+					.listen(getFunctionListener(mappedBindingEntry));
 		}
 		this.mappedListenerMethods.clear();
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private Function<Message<?>, Mono<Void>> getFunctionListener(Map.Entry<String, List<StreamListenerHandlerMethodMapping>> mappedBindingEntry){
+		Object targetBean = Objects.requireNonNull(this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey())).getTargetBean();
+		Method handlerMethod = Objects.requireNonNull(this.mappedListenerMethods.getFirst(mappedBindingEntry.getKey())).getMethod();
+
+		return message -> {
+			try {
+				return (Mono) handlerMethod.invoke(targetBean, message.getPayload(), message.getHeaders());
+			} catch (IllegalAccessException | InvocationTargetException ex) {
+				throw new RuntimeException(ex);
+			}
+		};
+	}
+
+	@Autowired
+	protected ReactorKafkaProperties reactorKafkaProperties;
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private ReactorStreamDispatcher getReactorStreamDispatcher(Class clazz, String channel){
+		return new ReactorStreamDispatcher(clazz, reactorKafkaProperties, channel);
 	}
 
 	@Override
@@ -198,11 +227,11 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 	}
 
 	/**
-	 * Extension point, allowing subclasses to customize the {@link StreamListener}
+	 * Extension point, allowing subclasses to customize the {@link ReactorStreamListener}
 	 * annotation detected by the postprocessor.
 	 * @param originalAnnotation the original annotation
 	 * @param annotatedMethod the method on which the annotation has been found
-	 * @return the postprocessed {@link StreamListener} annotation
+	 * @return the postprocessed {@link ReactorStreamListener} annotation
 	 */
 	protected ReactorStreamListener postProcessAnnotation(ReactorStreamListener  originalAnnotation,
 			Method annotatedMethod) {
@@ -212,12 +241,12 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 	private void doPostProcess(ReactorStreamListener reactorStreamListener, Method method,
 			Object bean) {
 		reactorStreamListener = postProcessAnnotation(reactorStreamListener, method);
-		Optional<StreamListenerSetupMethodOrchestrator> orchestratorOptional;
+		Optional<ReactorStreamListenerSetupMethodOrchestrator> orchestratorOptional;
 		orchestratorOptional = this.streamListenerSetupMethodOrchestrators.stream()
 				.filter(t -> t.supports(method)).findFirst();
 		Assert.isTrue(orchestratorOptional.isPresent(),
 				"A matching StreamListenerSetupMethodOrchestrator must be present");
-		StreamListenerSetupMethodOrchestrator streamListenerSetupMethodOrchestrator = orchestratorOptional
+		ReactorStreamListenerSetupMethodOrchestrator streamListenerSetupMethodOrchestrator = orchestratorOptional
 				.get();
 		streamListenerSetupMethodOrchestrator
 				.orchestrateStreamListenerSetupMethod(reactorStreamListener, method, bean);
@@ -316,7 +345,7 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 				.getBean(SpringIntegrationProperties.class);
 
 		this.streamListenerSetupMethodOrchestrators.addAll(this.applicationContext
-				.getBeansOfType(StreamListenerSetupMethodOrchestrator.class).values());
+				.getBeansOfType(ReactorStreamListenerSetupMethodOrchestrator.class).values());
 
 		// Default orchestrator for StreamListener method invocation is added last into
 		// the LinkedHashSet.
@@ -372,7 +401,7 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 
 	@SuppressWarnings("rawtypes")
 	private final class DefaultStreamListenerSetupMethodOrchestrator
-			implements StreamListenerSetupMethodOrchestrator {
+			implements ReactorStreamListenerSetupMethodOrchestrator {
 
 		private final ConfigurableApplicationContext applicationContext;
 
@@ -394,15 +423,15 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 				Method method, Object bean) {
 			String methodAnnotatedInboundName = streamListener.value();
 
-			String methodAnnotatedOutboundName = StreamListenerMethodUtils
+			String methodAnnotatedOutboundName = ReactorStreamListenerMethodUtils
 					.getOutboundBindingTargetName(method);
-			int inputAnnotationCount = StreamListenerMethodUtils
+			int inputAnnotationCount = ReactorStreamListenerMethodUtils
 					.inputAnnotationCount(method);
-			int outputAnnotationCount = StreamListenerMethodUtils
+			int outputAnnotationCount = ReactorStreamListenerMethodUtils
 					.outputAnnotationCount(method);
 			boolean isDeclarative = checkDeclarativeMethod(method,
 					methodAnnotatedInboundName, methodAnnotatedOutboundName);
-			StreamListenerMethodUtils.validateStreamListenerMethod(method,
+			ReactorStreamListenerMethodUtils.validateStreamListenerMethod(method,
 					inputAnnotationCount, outputAnnotationCount,
 					methodAnnotatedInboundName, methodAnnotatedOutboundName,
 					isDeclarative, streamListener.condition());
@@ -469,9 +498,9 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 				throw new BeanInitializationException(
 						"A bound component name must be specified");
 			}
-			final String defaultOutputChannel = StreamListenerMethodUtils
+			final String defaultOutputChannel = ReactorStreamListenerMethodUtils
 					.getOutboundBindingTargetName(method);
-			if (Void.TYPE.equals(method.getReturnType())) {
+			if (Mono.class.equals(method.getReturnType())) {
 				Assert.isTrue(StringUtils.isEmpty(defaultOutputChannel),
 						"An output channel cannot be specified for a method that does not return a value");
 			}
@@ -479,8 +508,8 @@ public class StreamListenerAnnotationBeanPostProcessor implements BeanPostProces
 				Assert.isTrue(!StringUtils.isEmpty(defaultOutputChannel),
 						"An output channel must be specified for a method that can return a value");
 			}
-			StreamListenerMethodUtils.validateStreamListenerMessageHandler(method);
-			StreamListenerAnnotationBeanPostProcessor.this.mappedListenerMethods.add(
+			ReactorStreamListenerMethodUtils.validateStreamListenerMessageHandler(method);
+			ReactorStreamListenerAnnotationBeanPostProcessor.this.mappedListenerMethods.add(
 					streamListener.value(),
 					new StreamListenerHandlerMethodMapping(bean, method,
 							streamListener.condition(), defaultOutputChannel,

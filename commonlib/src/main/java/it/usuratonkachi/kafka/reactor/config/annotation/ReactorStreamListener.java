@@ -115,9 +115,7 @@ import java.lang.annotation.*;
  * }
  * </pre>
  *
- * @author Marius Bogoevici
- * @author Ilayaperumal Gopinathan
- * @author Gary Russell
+ * @see org.springframework.cloud.stream.annotation.StreamListener
  * @see MessageMapping
  * @see EnableBinding
  * @see org.springframework.messaging.handler.annotation.SendTo

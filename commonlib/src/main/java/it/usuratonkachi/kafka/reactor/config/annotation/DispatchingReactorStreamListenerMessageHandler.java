@@ -32,10 +32,8 @@ import java.util.List;
  * internal {@link ConditionalStreamListenerMessageHandlerWrapper} instances, executing
  * the ones that match the given expression.
  *
- * @author Marius Bogoevici
- * @since 1.2
  */
-final class DispatchingStreamListenerMessageHandler
+final class DispatchingReactorStreamListenerMessageHandler
 		extends AbstractReplyProducingMessageHandler {
 
 	private final List<ConditionalStreamListenerMessageHandlerWrapper> handlerMethods;
@@ -44,7 +42,7 @@ final class DispatchingStreamListenerMessageHandler
 
 	private final EvaluationContext evaluationContext;
 
-	DispatchingStreamListenerMessageHandler(
+	DispatchingReactorStreamListenerMessageHandler(
 			Collection<ConditionalStreamListenerMessageHandlerWrapper> handlerMethods,
 			EvaluationContext evaluationContext) {
 		Assert.notEmpty(handlerMethods, "'handlerMethods' cannot be empty");
@@ -120,10 +118,10 @@ final class DispatchingStreamListenerMessageHandler
 
 		private final Expression condition;
 
-		private final StreamListenerMessageHandler streamListenerMessageHandler;
+		private final ReactorStreamListenerMessageHandler streamListenerMessageHandler;
 
 		ConditionalStreamListenerMessageHandlerWrapper(Expression condition,
-				StreamListenerMessageHandler streamListenerMessageHandler) {
+				ReactorStreamListenerMessageHandler streamListenerMessageHandler) {
 			Assert.notNull(streamListenerMessageHandler,
 					"the message handler cannot be null");
 			Assert.isTrue(condition == null || streamListenerMessageHandler.isVoid(),
@@ -140,7 +138,7 @@ final class DispatchingStreamListenerMessageHandler
 			return this.streamListenerMessageHandler.isVoid();
 		}
 
-		public StreamListenerMessageHandler getStreamListenerMessageHandler() {
+		public ReactorStreamListenerMessageHandler getStreamListenerMessageHandler() {
 			return this.streamListenerMessageHandler;
 		}
 

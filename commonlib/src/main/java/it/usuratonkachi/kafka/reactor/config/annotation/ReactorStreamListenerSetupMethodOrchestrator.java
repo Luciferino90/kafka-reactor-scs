@@ -18,7 +18,6 @@ package it.usuratonkachi.kafka.reactor.config.annotation;
 
 import org.springframework.cloud.stream.annotation.Input;
 import org.springframework.cloud.stream.annotation.Output;
-import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.cloud.stream.binding.StreamListenerAnnotationBeanPostProcessor;
 import org.springframework.cloud.stream.binding.StreamListenerErrorMessages;
 import org.springframework.cloud.stream.binding.StreamListenerParameterAdapter;
@@ -32,64 +31,64 @@ import org.springframework.util.StringUtils;
 import java.lang.reflect.Method;
 
 /**
- * Orchestrator used for invoking the {@link StreamListener} setup method.
+ * Orchestrator used for invoking the {@link ReactorStreamListener} setup method.
  *
  * By default {@link StreamListenerAnnotationBeanPostProcessor} will use an internal
  * implementation of this interface to invoke {@link StreamListenerParameterAdapter}s and
  * {@link StreamListenerResultAdapter}s or handler mappings on the method annotated with
- * {@link StreamListener}.
+ * {@link ReactorStreamListener}.
  *
  * By providing a different implementation of this interface and registering it as a
  * Spring Bean in the context, one can override the default invocation strategies used by
  * the {@link StreamListenerAnnotationBeanPostProcessor}. A typical usecase for such
  * overriding can happen when a downstream
  * {@link org.springframework.cloud.stream.binder.Binder} implementation wants to change
- * the way in which any of the default StreamListener handling needs to be changed in a
+ * the way in which any of the default ReactorStreamListener handling needs to be changed in a
  * custom manner.
  *
  * When beans of this interface are present in the context, they get priority in the
  * {@link StreamListenerAnnotationBeanPostProcessor} before falling back to the default
  * implementation.
  *
- * @author Soby Chacko
- * @see StreamListener
+ * @see org.springframework.cloud.stream.binding.StreamListenerSetupMethodOrchestrator
+ * @see ReactorStreamListener
  * @see StreamListenerAnnotationBeanPostProcessor
  */
-public interface StreamListenerSetupMethodOrchestrator {
+public interface ReactorStreamListenerSetupMethodOrchestrator {
 
 	/**
-	 * Checks the method annotated with {@link StreamListener} to see if this
+	 * Checks the method annotated with {@link ReactorStreamListener} to see if this
 	 * implementation can successfully orchestrate this method.
-	 * @param method annotated with {@link StreamListener}
+	 * @param method annotated with {@link ReactorStreamListener}
 	 * @return true if this implementation can orchestrate this method, false otherwise
 	 */
 	boolean supports(Method method);
 
 	/**
-	 * Method that allows custom orchestration on the {@link StreamListener} setup method.
-	 * @param streamListener reference to the {@link StreamListener} annotation on the
+	 * Method that allows custom orchestration on the {@link ReactorStreamListener} setup method.
+	 * @param ReactorStreamListener reference to the {@link ReactorStreamListener} annotation on the
 	 * method
-	 * @param method annotated with {@link StreamListener}
-	 * @param bean that contains the StreamListener method
+	 * @param method annotated with {@link ReactorStreamListener}
+	 * @param bean that contains the ReactorStreamListener method
 	 *
 	 */
-	void orchestrateStreamListenerSetupMethod(ReactorStreamListener streamListener,
+	void orchestrateStreamListenerSetupMethod(ReactorStreamListener ReactorStreamListener,
                                               Method method, Object bean);
 
 	/**
 	 * Default implementation for adapting each of the incoming method arguments using an
 	 * available {@link StreamListenerParameterAdapter} and provide the adapted collection
 	 * of arguments back to the caller.
-	 * @param method annotated with {@link StreamListener}
+	 * @param method annotated with {@link ReactorStreamListener}
 	 * @param inboundName inbound binding
 	 * @param applicationContext spring application context
-	 * @param streamListenerParameterAdapters used for adapting the method arguments
+	 * @param ReactorStreamListenerParameterAdapters used for adapting the method arguments
 	 * @return adapted incoming arguments
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	default Object[] adaptAndRetrieveInboundArguments(Method method, String inboundName,
                                                       ApplicationContext applicationContext,
-                                                      StreamListenerParameterAdapter... streamListenerParameterAdapters) {
+                                                      StreamListenerParameterAdapter... ReactorStreamListenerParameterAdapters) {
 		Object[] arguments = new Object[method.getParameterTypes().length];
 		for (int parameterIndex = 0; parameterIndex < arguments.length; parameterIndex++) {
 			MethodParameter methodParameter = MethodParameter.forExecutable(method,
@@ -113,7 +112,7 @@ public interface StreamListenerSetupMethodOrchestrator {
 				Object targetBean = applicationContext
 						.getBean((String) targetReferenceValue);
 				// Iterate existing parameter adapters first
-				for (StreamListenerParameterAdapter streamListenerParameterAdapter : streamListenerParameterAdapters) {
+				for (StreamListenerParameterAdapter streamListenerParameterAdapter : ReactorStreamListenerParameterAdapters) {
 					if (streamListenerParameterAdapter.supports(targetBean.getClass(),
 							methodParameter)) {
 						arguments[parameterIndex] = streamListenerParameterAdapter

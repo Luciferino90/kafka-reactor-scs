@@ -129,7 +129,7 @@ defaut:
 logging:
   level:
     root: INFO
-    it.usuratonkachi.kafka.reactor.config: DEBUG
+    it.usuratonkachi.kafka.reactor.config: INFO
 ---
 spring:
   profiles: 1
