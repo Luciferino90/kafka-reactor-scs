@@ -340,7 +340,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		this.binderAwareChannelResolver = this.applicationContext
 				.getBean("binderAwareChannelResolver", DestinationResolver.class);
 		this.messageHandlerMethodFactory = this.applicationContext
-				.getBean("integrationMessageHandlerMethodFactory", MessageHandlerMethodFactory.class);
+				.getBean(MessageHandlerMethodFactory.class);
 		this.springIntegrationProperties = this.applicationContext
 				.getBean(SpringIntegrationProperties.class);
 
