@@ -4,8 +4,8 @@ import it.usuratonkachi.kafka.dto.Mail;
 import it.usuratonkachi.kafka.dto.Message;
 import it.usuratonkachi.kafka.dto.Mms;
 import it.usuratonkachi.kafka.dto.Sms;
-import it.usuratonkachi.kafka.reactor.config.binder.ReactorChannelBinder;
 import it.usuratonkachi.kafka.reactor.config.binder.ReactorChannel;
+import it.usuratonkachi.kafka.reactor.config.binder.ReactorChannelBinder;
 import org.springframework.messaging.MessageChannel;
 
 /**

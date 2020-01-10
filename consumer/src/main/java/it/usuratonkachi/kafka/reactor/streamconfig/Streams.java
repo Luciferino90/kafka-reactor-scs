@@ -4,8 +4,8 @@ import it.usuratonkachi.kafka.dto.Mail;
 import it.usuratonkachi.kafka.dto.Message;
 import it.usuratonkachi.kafka.dto.Mms;
 import it.usuratonkachi.kafka.dto.Sms;
-import it.usuratonkachi.kafka.reactor.config.binder.ReactorChannelBinder;
 import it.usuratonkachi.kafka.reactor.config.binder.ReactorChannel;
+import it.usuratonkachi.kafka.reactor.config.binder.ReactorChannelBinder;
 import org.springframework.messaging.MessageChannel;
 
 /**
@@ -19,15 +19,15 @@ public class Streams {
 	public final static String SMS_CHANNEL_INPUT = "sms-kafka-in";
 
 	@ReactorChannel(value = MAIL_CHANNEL_INPUT, messageType = Mail.class)
-	MessageChannel outboundMailKafka;
+	MessageChannel inboundMailKafka;
 
 	@ReactorChannel(value = MESSAGE_CHANNEL_INPUT, messageType = Message.class)
-	MessageChannel outboundMessageKafka;
+	MessageChannel inboundMessageKafka;
 
 	@ReactorChannel(value = MMS_CHANNEL_INPUT, messageType = Mms.class)
-	MessageChannel outboundMmsKafka;
+	MessageChannel inboundMmsKafka;
 
 	@ReactorChannel(value = SMS_CHANNEL_INPUT, messageType = Sms.class)
-	MessageChannel outboundSmsKafka;
+	MessageChannel inboundSmsKafka;
 
 }

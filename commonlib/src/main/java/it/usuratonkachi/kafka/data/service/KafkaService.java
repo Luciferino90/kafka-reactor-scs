@@ -43,7 +43,7 @@ public class KafkaService {
 			k.setAckedby(profile);
 			k.setAckreceived(k.getAckreceived()+1);
 			k = kafkaRepository.saveAndFlush(k);
-			//log.info("First Received " + k.toString() );
+			log.info("First Received " + k.toString() );
 		} else {
 			log.warn("Msg already acked! " + k.toString());
 			kafkaRepository.addAck(k.getId());
