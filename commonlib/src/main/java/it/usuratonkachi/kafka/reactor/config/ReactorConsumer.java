@@ -15,6 +15,7 @@ import reactor.kafka.receiver.ReceiverRecord;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class ReactorConsumer {
@@ -22,6 +23,7 @@ public class ReactorConsumer {
     private final KafkaConsumerProperties kafkaConsumerProperties;
     private final BindingProperties bindingProperties;
     private final ConsumerProperties consumerProperties;
+    private final String destination;
     private final String hosts;
     private final String group;
     @Getter
@@ -47,9 +49,20 @@ public class ReactorConsumer {
         return ContainerProperties.AckMode.MANUAL.equals(ackMode);
     }
 
+    public ReactorConsumer(String hosts, String group, String labelNameDestinationIsMissing){
+        kafkaConsumerProperties = new KafkaConsumerProperties();
+        bindingProperties = new BindingProperties();
+        consumerProperties = new ConsumerProperties();
+        this.destination = labelNameDestinationIsMissing;
+        this.hosts = hosts;
+        this.group = group;
+        this.receiver = reactiveKafkaReceiver();
+    }
+
     public ReactorConsumer(
             KafkaConsumerProperties kafkaConsumerProperties, BindingProperties bindingProperties, ConsumerProperties consumerProperties, String hosts, String group){
         this.kafkaConsumerProperties = kafkaConsumerProperties;
+        this.destination = bindingProperties.getDestination();
         this.bindingProperties = bindingProperties;
         this.consumerProperties = consumerProperties;
         this.hosts = hosts;
@@ -57,6 +70,7 @@ public class ReactorConsumer {
         this.receiver = reactiveKafkaReceiver();
     }
 
+    AtomicLong a = new AtomicLong(0);
     public Flux<ReceiverRecord<byte[], byte[]>> receive(){
         return receiver.receive()
                 .doOnError(Throwable::printStackTrace);
@@ -73,7 +87,7 @@ public class ReactorConsumer {
 
     private Map<String, Object> kafkaConsumerConfiguration() {
         Map<String, Object> properties = new HashMap<>();
-        properties.put(ConsumerConfig.CLIENT_ID_CONFIG, bindingProperties.getDestination() + "-" + UUID.randomUUID().toString());
+        properties.put(ConsumerConfig.CLIENT_ID_CONFIG, destination + "-" + UUID.randomUUID().toString());
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, group);
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, hosts);
 

@@ -29,6 +29,13 @@ public class ReactorProducer {
         this.producer = reactiveKafkaSender();
     }
 
+    public ReactorProducer(String hosts, String group, String labelNameDestinationIsMissing){
+        this.hosts = hosts;
+        producerProperties = new ProducerProperties();
+        kafkaProducerProperties = new KafkaProducerProperties();
+        this.producer = reactiveKafkaSender();
+    }
+
     public Flux<SenderResult<Object>> send(Flux<SenderRecord<byte[], byte[], Object>> messageSource){
         return producer.send(messageSource);
     }

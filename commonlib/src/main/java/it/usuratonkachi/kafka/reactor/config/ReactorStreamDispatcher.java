@@ -39,6 +39,8 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 
 	private final ReactorKafkaConfiguration reactorKafkaConfiguration;
 
+	private final ReactorKafkaProperties reactorKafkaProperties;
+
 	private Class<T> clazz;
 	private ObjectMapper objectMapper;
 	private boolean alreadyStarted = false;
@@ -55,6 +57,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 	 */
 	public ReactorStreamDispatcher(Class<T> clazz, ReactorKafkaProperties reactiveKafkaProperties, String labelTopicName){
 		this.clazz = clazz;
+		this.reactorKafkaProperties = reactiveKafkaProperties;
 		this.objectMapper = reactiveKafkaProperties.getObjectMapper();
 		this.reactorKafkaConfiguration = new ReactorKafkaConfiguration(reactiveKafkaProperties, labelTopicName);
 	}
@@ -63,7 +66,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 		if (alreadyStarted) return;
 		else alreadyStarted = true;
 		ReactorConsumer consumer = reactorKafkaConfiguration.getConsumer();
-		if (consumer != null) {
+		if (consumer != null || this.reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings().containsKey("notification-in")) {
 			if (consumer.hasManualAck())
 				listenAtleastOnce(function, consumer);
 			else

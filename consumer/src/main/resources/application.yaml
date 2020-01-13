@@ -43,6 +43,12 @@ spring:
           brokers: localhost:9092
           auto-add-partitions: true
         bindings:
+          notification-in:
+            consumer:
+              configuration:
+                concurrency: 1
+                max-attempts: 3
+                partitioned: true
           mail-kafka-in:
             consumer:
               configuration:
@@ -80,6 +86,15 @@ spring:
                 partition.assignment.strategy: org.apache.kafka.clients.consumer.RangeAssignor
                 auto.offset.reset: earliest
       bindings:
+        notification-in: # consumer
+          destination: notification
+          contentType: application/json
+          consumer:
+            #enable.auto.commit: true
+            #auto.commit.interval.ms: 0
+            concurrency: 1
+            max-attempts: 3
+            partitioned: true
         mail-kafka-in: # consumer
           group: ${spring.application.name}
           destination: mail-kafka-topic

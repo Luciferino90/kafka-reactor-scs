@@ -1,20 +1,22 @@
 package it.usuratonkachi.kafka.reactor;
 
 import it.usuratonkachi.kafka.data.service.KafkaService;
-import it.usuratonkachi.kafka.dto.Mail;
-import it.usuratonkachi.kafka.dto.Message;
-import it.usuratonkachi.kafka.dto.Mms;
-import it.usuratonkachi.kafka.dto.Sms;
+import it.usuratonkachi.kafka.dto.*;
 import it.usuratonkachi.kafka.reactor.config.annotation.output.ReactorMessageChannel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.Headers;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.time.Duration;
+import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,14 +44,16 @@ public class ReactorProducer implements CommandLineRunner {
 	private MessageChannel mmsDispatcher;
 	@ReactorMessageChannel(SMS_CHANNEL_OUTPUT)
 	private MessageChannel smsDispatcher;
+	@ReactorMessageChannel(NOTIFICATION_CHANNEL_OUTPUT)
+	private MessageChannel notificationDispatcher;
 
 	private final KafkaService kafkaService;
 
 	@Override
 	public void run(String... args) {
 		count = 1000;
-		// runLimited();
-		runForever();
+		runLimited();
+		// runForever();
 	}
 
 	AtomicInteger base = new AtomicInteger(0);
@@ -130,12 +134,42 @@ public class ReactorProducer implements CommandLineRunner {
 				.map(smsDispatcher::send);
 	}
 
+	private Flux<Boolean> sendNotification(Integer count, Integer baseCount){
+		int start = baseCount;
+		int end = count + baseCount;
+
+		int intero = 45;
+		long lungo = 1578916983529L;
+		return Flux.fromStream(IntStream.range(start, end).boxed())
+				.map(j -> {
+					Notification notification = new Notification();
+					notification.setUserId("usurantokachi");
+					return notification;
+				})
+				.map(o -> MessageBuilder.withPayload(o)
+						.copyHeaders(
+								Map.of(
+										"X-Test", "Prova MAIL",
+										KafkaHeaders.RECEIVED_TOPIC, "Notification",
+										KafkaHeaders.RECEIVED_MESSAGE_KEY,  "key",
+										KafkaHeaders.RECEIVED_PARTITION_ID, intero,
+										KafkaHeaders.RECEIVED_TIMESTAMP, lungo
+								)
+						)
+						.build()
+				)
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				.map(notificationDispatcher::send);
+	}
+
 	public void runLimited() {
 		String msg = profile;
+		count = 1;
 		sendMail(count, 0).subscribe();
-		//sendMessage(count, 0).subscribe();
-		//sendMms(count, 0).subscribe();
-		//sendSms(count, 0).collectList().block();
+		sendMessage(count, 0).subscribe();
+		sendMms(count, 0).subscribe();
+		sendSms(count, 0).collectList().block();
+		sendNotification(count, 0).blockLast();
 	}
 
 	public void runForever() {

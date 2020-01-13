@@ -1,6 +1,7 @@
 package it.usuratonkachi.kafka.reactor.config;
 
 import lombok.Getter;
+import org.springframework.cloud.stream.binder.kafka.properties.KafkaBindingProperties;
 import org.springframework.cloud.stream.binder.kafka.properties.KafkaProducerProperties;
 import org.springframework.cloud.stream.config.BindingProperties;
 
@@ -26,7 +27,10 @@ public class ReactorKafkaConfiguration {
 	@Getter
 	private Integer concurrency = 1;
 
+	private ReactorKafkaProperties r;
+
 	public ReactorKafkaConfiguration(ReactorKafkaProperties reactorKafkaProperties, String labelTopicName){
+		this.r = reactorKafkaProperties;
 		labelName = labelTopicName;
 		topicName = reactorKafkaProperties.getBindingServiceProperties().getBindingDestination(labelName);
 
@@ -45,6 +49,30 @@ public class ReactorKafkaConfiguration {
 		bindingPropertiesConsumer
 				.ifPresent(bindingProperties -> concurrency = bindingProperties.getConsumer().getConcurrency());
 
+		bindingPropertiesConsumer.ifPresent(bindingProperties -> {
+			consumer = new ReactorConsumer(
+					reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings().get(labelName).getConsumer(),
+					bindingPropertiesConsumer.get(),
+					reactorKafkaProperties.getBindingServiceProperties().getBindings().get(labelName).getConsumer(),
+					hosts,
+					reactorKafkaProperties.getApplicationName());
+		});
+
+		Optional.ofNullable(reactorKafkaProperties.getKafkaExtendedBindingProperties())
+				.flatMap(kafkaExtendedBindingProperties -> Optional.ofNullable(kafkaExtendedBindingProperties.getBindings()))
+				.ifPresent(bindings -> {
+					if (bindings.containsKey(labelName))
+						Optional.ofNullable(bindings.get(labelName).getConsumer())
+								.ifPresent(kafkaConsumerProperties -> {
+									if (consumer == null) {
+										consumer = new ReactorConsumer(hosts, reactorKafkaProperties.getApplicationName(), labelName);
+									}
+									concurrency = Integer.valueOf(Optional.ofNullable(
+											kafkaConsumerProperties.getConfiguration().get("concurrency"))
+											.orElse(concurrency.toString()));
+								});
+				});
+
 		Optional<BindingProperties> bindingPropertiesProducer = reactorKafkaProperties.getBindingServiceProperties()
 				.getBindings()
 				.entrySet()
@@ -52,14 +80,6 @@ public class ReactorKafkaConfiguration {
 				.filter(b -> labelName.equalsIgnoreCase(b.getKey()) && b.getValue().getProducer() != null)
 				.map(Map.Entry::getValue)
 				.findFirst();
-
-		bindingPropertiesConsumer.ifPresent(bindingProperties -> {
-			consumer = new ReactorConsumer(
-					reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings().get(labelName)
-							.getConsumer(), bindingPropertiesConsumer.get(),
-					reactorKafkaProperties.getBindingServiceProperties().getBindings().get(labelName).getConsumer(),
-					hosts, reactorKafkaProperties.getApplicationName());
-		});
 
 		bindingPropertiesProducer.ifPresent(bindingProperties -> {
 			KafkaProducerProperties kafkaProducerProperties = null;
@@ -75,6 +95,19 @@ public class ReactorKafkaConfiguration {
 					hosts
 			);
 		});
+
+		Optional.ofNullable(reactorKafkaProperties.getKafkaExtendedBindingProperties())
+				.flatMap(kafkaExtendedBindingProperties -> Optional.ofNullable(kafkaExtendedBindingProperties.getBindings()))
+				.ifPresent(bindings -> {
+					if (bindings.containsKey(labelName))
+						Optional.ofNullable(bindings.get(labelName).getProducer())
+								.ifPresent(kafkaProducerProperties -> {
+									if (producer == null) {
+										producer = new ReactorProducer(hosts, reactorKafkaProperties.getApplicationName(), labelName);
+									}
+								});
+				});
+
 	}
 
 
