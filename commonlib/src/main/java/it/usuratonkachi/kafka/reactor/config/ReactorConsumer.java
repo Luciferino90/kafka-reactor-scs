@@ -108,19 +108,19 @@ public class ReactorConsumer {
 
     private ReceiverOptions<byte[], byte[]> kafkaReceiverOptions() {
         ReceiverOptions<byte[], byte[]> options = ReceiverOptions.create(kafkaConsumerConfiguration());
-        return options.subscription(Arrays.asList(this.bindingProperties.getDestination()))
+        return options.subscription(Arrays.asList(this.bindingProperties.getDestination().split(",")))
                 .withKeyDeserializer(new ByteArrayDeserializer())
                 .withValueDeserializer(new ByteArrayDeserializer())
                 .addAssignListener(receiverPartitions -> {
                     assignedPartitions = receiverPartitions.stream().map(receiverPartition -> receiverPartition.topicPartition().partition()).collect(
-							Collectors.toList());
+                            Collectors.toList());
                 })
                 .addRevokeListener(receiverPartitions -> {
                     toAck.values().stream().flatMap(Collection::stream).forEach(this::ackRecord);
                     List<Integer> revokedPartition = receiverPartitions.stream().map(receiverPartition -> receiverPartition.topicPartition().partition()).collect(
-							Collectors.toList());
+                            Collectors.toList());
                     assignedPartitions = assignedPartitions.stream().filter(assignedPartition -> !revokedPartition.contains(assignedPartition)).collect(
-							Collectors.toList());
+                            Collectors.toList());
                 })
                 .maxCommitAttempts(0);
     }

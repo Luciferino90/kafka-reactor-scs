@@ -1,7 +1,6 @@
 package it.usuratonkachi.kafka.reactor.config;
 
 import lombok.Getter;
-import org.springframework.cloud.stream.binder.kafka.properties.KafkaBindingProperties;
 import org.springframework.cloud.stream.binder.kafka.properties.KafkaProducerProperties;
 import org.springframework.cloud.stream.config.BindingProperties;
 
@@ -27,10 +26,10 @@ public class ReactorKafkaConfiguration {
 	@Getter
 	private Integer concurrency = 1;
 
-	private ReactorKafkaProperties r;
+	private ReactorKafkaProperties reactorKafkaProperties;
 
 	public ReactorKafkaConfiguration(ReactorKafkaProperties reactorKafkaProperties, String labelTopicName){
-		this.r = reactorKafkaProperties;
+		this.reactorKafkaProperties = reactorKafkaProperties;
 		labelName = labelTopicName;
 		topicName = reactorKafkaProperties.getBindingServiceProperties().getBindingDestination(labelName);
 
@@ -64,9 +63,9 @@ public class ReactorKafkaConfiguration {
 					if (bindings.containsKey(labelName))
 						Optional.ofNullable(bindings.get(labelName).getConsumer())
 								.ifPresent(kafkaConsumerProperties -> {
-									if (consumer == null) {
-										consumer = new ReactorConsumer(hosts, reactorKafkaProperties.getApplicationName(), labelName);
-									}
+									//if (consumer == null) {
+									//	consumer = new ReactorConsumer(hosts, reactorKafkaProperties.getApplicationName(), labelName);
+									//}
 									concurrency = Integer.valueOf(Optional.ofNullable(
 											kafkaConsumerProperties.getConfiguration().get("concurrency"))
 											.orElse(concurrency.toString()));

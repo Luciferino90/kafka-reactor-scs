@@ -40,10 +40,11 @@ import java.io.ObjectInputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static it.usuratonkachi.kafka.reactor.config.ReactorStreamDispatcher.mapToSingleElement;
 
 /**
  * {@link BeanPostProcessor} that handles {@link ReactorStreamListener} annotations found on bean
@@ -63,7 +64,16 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		@Getter
 		private int headerPosition;
 		@Getter
-		private Map<Integer, String> headerMap;
+		private Map<Integer, Header> headerMap;
+
+		@AllArgsConstructor
+		static class Header {
+			@Getter
+			private String value;
+			@Getter
+			private boolean required;
+		}
+
 	}
 
 	private ConfigurableApplicationContext applicationContext;
@@ -91,7 +101,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 	private ParamsPosition getParameterPosition(Annotation[][] annotations){
 		int payloadPosition = -1;
 		int headerPosition = -1;
-		Map<Integer, String> headerMap = new HashMap<>();
+		Map<Integer, ParamsPosition.Header> headerMap = new HashMap<>();
 		for (int i = 0; i < annotations.length; i++){
 			Annotation[] anns = annotations[i];
 			for (Annotation ann : anns) {
@@ -99,8 +109,9 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 					payloadPosition = i;
 				else if (Headers.class.equals(ann.annotationType()))
 					headerPosition = i;
-				else if (Header.class.equals(ann.annotationType()))
-					headerMap.put(i, ((Header)ann).value());
+				else if (Header.class.equals(ann.annotationType())) {
+					headerMap.put(i, new ParamsPosition.Header(((Header)ann).value(), ((Header)ann).required()));
+				}
 			}
 		}
 		return new ParamsPosition(payloadPosition, headerPosition, headerMap);
@@ -110,8 +121,23 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		ParamsPosition parameterPosition = getParameterPosition(method.getParameterAnnotations());
 		Object[] params = new Object[2 + parameterPosition.getHeaderMap().size()];
 		params[parameterPosition.getPayloadPosition()] = message.getPayload();
-		params[parameterPosition.getHeaderPosition()] = message.getHeaders();
-		parameterPosition.getHeaderMap().forEach((key, value) -> params[key] = castHeader(method.getAnnotatedParameterTypes()[key].getType().getTypeName(), (byte[])message.getHeaders().get(value)));
+		List<String> extractedHeaders = new ArrayList<>();
+		parameterPosition.getHeaderMap().forEach((key, value) -> {
+			if (!message.getHeaders().containsKey(value.getValue()) && value.isRequired()) {
+				throw new RuntimeException(String.format("Missing header %s from message", value));
+			} else if (message.getHeaders().containsKey(value.getValue())) {
+				params[key] = castHeader(method.getAnnotatedParameterTypes()[key].getType().getTypeName(), (byte[]) message.getHeaders().get(value.getValue()));
+			} else {
+				params[key] = defaultNullValue(method.getAnnotatedParameterTypes()[key].getType().getTypeName());
+			}
+			extractedHeaders.add(value.getValue());
+		});
+		params[parameterPosition.getHeaderPosition()] = message.getHeaders().entrySet()
+				.stream()
+				.filter(entry -> !extractedHeaders.contains(entry.getKey()))
+				.collect(Collectors
+						.groupingBy(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, mapToSingleElement())));
+
 		return params;
 	}
 
@@ -145,6 +171,24 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 				}
 			}
 		} catch (IOException | ClassNotFoundException e) {
+			throw new RuntimeException(String.format("Header conversion for type %s not yet supported", className), e);
+		}
+	}
+
+	private Object defaultNullValue(String className){
+		try {
+			Class<?> clazz = ClassUtils.getClass(className);
+			if (clazz.isPrimitive()){
+				clazz = ClassUtils.primitiveToWrapper(clazz);
+				if (clazz.equals(Long.class)) {
+					return 0L;
+				} else if (clazz.equals(Integer.class)) {
+					return 0;
+				} else throw new ClassNotFoundException("No primitive found for class " + className);
+			} else {
+				return null;
+			}
+		} catch (ClassNotFoundException e) {
 			throw new RuntimeException(String.format("Header conversion for type %s not yet supported", className), e);
 		}
 	}

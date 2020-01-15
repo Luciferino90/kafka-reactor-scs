@@ -46,7 +46,8 @@ import java.util.stream.Collectors;
  */
 @Component
 @RequiredArgsConstructor
-public class ReactorChannelBinderAnnotationBeanPostProcessor implements BeanPostProcessor, ApplicationContextAware, PriorityOrdered {
+public class ReactorChannelBinderAnnotationBeanPostProcessor implements BeanPostProcessor, ApplicationContextAware,
+		PriorityOrdered {
 
 	private ReactorKafkaProperties reactorKafkaProperties;
 

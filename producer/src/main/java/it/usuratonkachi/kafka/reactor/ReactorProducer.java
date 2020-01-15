@@ -8,15 +8,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.handler.annotation.Header;
-import org.springframework.messaging.handler.annotation.Headers;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.time.Duration;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,8 +49,8 @@ public class ReactorProducer implements CommandLineRunner {
 	@Override
 	public void run(String... args) {
 		count = 1000;
-		runLimited();
-		// runForever();
+		//runLimited();
+		runForever();
 	}
 
 	AtomicInteger base = new AtomicInteger(0);
@@ -144,6 +141,8 @@ public class ReactorProducer implements CommandLineRunner {
 				.map(j -> {
 					Notification notification = new Notification();
 					notification.setUserId("usurantokachi");
+					notification.setEventTypeId("evento");
+					notification.setTemplateMetadata(new HashMap<>());
 					return notification;
 				})
 				.map(o -> MessageBuilder.withPayload(o)
@@ -169,7 +168,7 @@ public class ReactorProducer implements CommandLineRunner {
 		sendMessage(count, 0).subscribe();
 		sendMms(count, 0).subscribe();
 		sendSms(count, 0).collectList().block();
-		sendNotification(count, 0).blockLast();
+		//sendNotification(count, 0).blockLast();
 	}
 
 	public void runForever() {

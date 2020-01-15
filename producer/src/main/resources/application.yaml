@@ -42,7 +42,19 @@ spring:
         binder:
           brokers: localhost:9092 # 10.64.138.77:9092
           auto-add-partitions: true
+        bindings:
+          notification-out:
+            consumer:
+              ack-each-record: true
+              configuration:
+                max.poll.records: 1
       bindings:
+        notification-out: # producer
+          group: ${spring.application.name}
+          destination: notification # nome della coda di kafka. If not set, the channel name is used instead.
+          contentType: application/json
+          #producer:
+          #  partition-count: 1
         mail-kafka-out: # producer
           group: ${spring.application.name}
           destination: mail-kafka-topic # nome della coda di kafka. If not set, the channel name is used instead.

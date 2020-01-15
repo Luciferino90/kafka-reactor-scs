@@ -16,14 +16,14 @@ public class Streams {
 	public final static String SMS_CHANNEL_OUTPUT = "sms-kafka-out";
 	public final static String NOTIFICATION_CHANNEL_OUTPUT = "notification-out";
 
-	//@ReactorChannel(value = MAIL_CHANNEL_OUTPUT, messageType = Mail.class)
-	//MessageChannel outboundMailKafka;
-	//@ReactorChannel(value = MESSAGE_CHANNEL_OUTPUT, messageType = Message.class)
-	//MessageChannel outboundMessageKafka;
-	//@ReactorChannel(value = MMS_CHANNEL_OUTPUT, messageType = Mms.class)
-	//MessageChannel outboundMmsKafka;
-	//@ReactorChannel(value = SMS_CHANNEL_OUTPUT, messageType = Sms.class)
-	//MessageChannel outboundSmsKafka;
+	@ReactorChannel(value = MAIL_CHANNEL_OUTPUT, messageType = Mail.class)
+	MessageChannel outboundMailKafka;
+	@ReactorChannel(value = MESSAGE_CHANNEL_OUTPUT, messageType = Message.class)
+	MessageChannel outboundMessageKafka;
+	@ReactorChannel(value = MMS_CHANNEL_OUTPUT, messageType = Mms.class)
+	MessageChannel outboundMmsKafka;
+	@ReactorChannel(value = SMS_CHANNEL_OUTPUT, messageType = Sms.class)
+	MessageChannel outboundSmsKafka;
 	@ReactorChannel(value = NOTIFICATION_CHANNEL_OUTPUT, messageType = Notification.class)
 	MessageChannel outboundNotificationKafka;
 

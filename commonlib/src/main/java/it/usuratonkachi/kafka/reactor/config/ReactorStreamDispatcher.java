@@ -7,6 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
@@ -19,7 +20,9 @@ import reactor.kafka.sender.SenderResult;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -66,7 +69,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 		if (alreadyStarted) return;
 		else alreadyStarted = true;
 		ReactorConsumer consumer = reactorKafkaConfiguration.getConsumer();
-		if (consumer != null || this.reactorKafkaProperties.getKafkaExtendedBindingProperties().getBindings().containsKey("notification-in")) {
+		if (consumer != null) {
 			if (consumer.hasManualAck())
 				listenAtleastOnce(function, consumer);
 			else
@@ -110,7 +113,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 							return oldOffset.isEmpty() || oldOffset.get() < r.offset();
 						})
 						.switchIfEmpty(Mono.defer(() -> {
-							log.debug("Message alrerady managed by this consumer. Skipped.");
+							log.debug("Message already managed by this consumer. Skipped.");
 							return Mono.empty();
 						}))
 						.filter(r -> consumer.hasPartitionAssigned(r.partition()))
@@ -129,11 +132,13 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 											}
 											return Mono.empty();
 										}))
+										.doOnError(e -> log.error(e.getMessage(), e))
 										.doOnError(RuntimeException.class, businessException -> {
 											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
 												consumer.ackRecord(receiverRecord);
 											}
-										});
+										})
+										.onErrorResume(e -> Mono.empty());
 							} catch (Exception ex) {
 								log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
 							}
@@ -141,6 +146,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 						})
 				)
 				.doOnError(Throwable::printStackTrace)
+				.onErrorResume(e -> Mono.empty())
 				.subscribe();
 
 	}
@@ -156,7 +162,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 							return oldOffset.isEmpty() || oldOffset.get() < r.offset();
 						})
 						.switchIfEmpty(Mono.defer(() -> {
-							log.debug("Message alrerady managed by this consumer. Skipped.");
+							log.debug("Message already managed by this consumer. Skipped.");
 							return Mono.empty();
 						}))
 						.filter(r -> consumer.hasPartitionAssigned(r.partition()))
@@ -169,12 +175,13 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 							try {
 								return function.apply(consumerRecordToMessage(consumerRecord));
 							} catch (Exception ex) {
-								log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+								log.warn("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
 							}
 							return Mono.empty();
 						})
 				)
 				.doOnError(Throwable::printStackTrace)
+				.onErrorResume(e -> Mono.empty())
 				.subscribe();
 	}
 
@@ -240,17 +247,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 	private Iterable<Header> headersToProducerRecordHeaders(Message<?> message){
 		return message.getHeaders().entrySet().stream()
 				.filter(entryHeader -> entryHeader.getValue() instanceof Serializable)
-				.map(entryHeader -> {
-					if (entryHeader.getValue() instanceof byte[])
-						return new RecordHeader(entryHeader.getKey(), (byte[])entryHeader.getValue());
-					else {
-						try {
-							return new RecordHeader(entryHeader.getKey(), objectMapper.writeValueAsBytes(entryHeader.getValue()));
-						} catch (JsonProcessingException e) {
-							throw new RuntimeException(e);
-						}
-					}
-				})
+				.map(entryHeader -> new RecordHeader(entryHeader.getKey(), serializeHeader(entryHeader.getValue())))
 				.collect(Collectors.toList());
 	}
 
@@ -261,6 +258,11 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 	 */
 	private Message<T> receiverRecordToMessage(ReceiverRecord<byte[], byte[]> receiverRecord) {
 		Map<String, Object> headersMap = receiverRecordToHeaders(receiverRecord);
+		headersMap.putAll(Map.of(
+				KafkaHeaders.RECEIVED_PARTITION_ID, serializeHeader(receiverRecord.receiverOffset().topicPartition().partition()),
+				KafkaHeaders.RECEIVED_TOPIC, serializeHeader(receiverRecord.receiverOffset().topicPartition().topic()),
+				KafkaHeaders.RECEIVED_TIMESTAMP, serializeHeader(receiverRecord.timestamp())
+		));
 		MessageHeaders headers = new MessageHeaders(headersMap);
 		return receiverRecordToMessage(receiverRecord, headers);
 	}
@@ -292,7 +294,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 	private Map<String, Object> consumerRecordToHeaders(ConsumerRecord<byte[], byte[]> receiverRecord){
 		return StreamSupport.stream(receiverRecord.headers().spliterator(), false)
 				.map(header -> Tuples.of(header.key(), header.value()))
-				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
+				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, mapToSingleElement())));
 	}
 
 	/**
@@ -302,6 +304,11 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 	 */
 	private Message<T> consumerRecordToMessage(ConsumerRecord<byte[], byte[]> consumerRecord) {
 		Map<String, Object> headersMap = consumerRecordToHeaders(consumerRecord);
+		headersMap.putAll(Map.of(
+				KafkaHeaders.RECEIVED_PARTITION_ID, serializeHeader(consumerRecord.partition()),
+				KafkaHeaders.RECEIVED_TOPIC, serializeHeader(consumerRecord.topic()),
+				KafkaHeaders.RECEIVED_TIMESTAMP, serializeHeader(consumerRecord.timestamp())
+		));
 		MessageHeaders headers = new MessageHeaders(headersMap);
 		return consumerRecordToMessage(consumerRecord, headers);
 	}
@@ -333,7 +340,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 	private Map<String, Object> receiverRecordToHeaders(ReceiverRecord<byte[], byte[]> receiverRecord){
 		return StreamSupport.stream(receiverRecord.headers().spliterator(), false)
 				.map(header -> Tuples.of(header.key(), header.value()))
-				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, toSingleton())));
+				.collect(Collectors.groupingBy(Tuple2::getT1, Collectors.mapping(Tuple2::getT2, mapToSingleElement())));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -343,6 +350,17 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 
 	@SuppressWarnings("unchecked")
 	private T deserializeObject(byte[] serialized, Class<T> clazz){
+
+		if (clazz.equals(List.class)) {
+			T m = null;
+			try {
+				m = (T) objectMapper.readValue(serialized, List.class);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			return m;
+		}
+
 		try {
 			Map<String, Object> content = objectMapper.readValue(serialized, Map.class);
 			if (content != null && content.containsKey("payload"))
@@ -356,7 +374,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 		}
 	}
 
-	public static <T> Collector<T, ?, T> toSingleton() {
+	public static <T> Collector<T, ?, T> mapToSingleElement() {
 		return Collectors.collectingAndThen(
 				Collectors.toList(),
 				list -> {
@@ -366,6 +384,18 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 					return list.get(0);
 				}
 		);
+	}
+
+	private byte[] serializeHeader(Object headerValue){
+		if (headerValue instanceof byte[])
+			return (byte[]) headerValue;
+		else {
+			try {
+				return objectMapper.writeValueAsBytes(headerValue);
+			} catch (JsonProcessingException e) {
+				throw new RuntimeException(e);
+			}
+		}
 	}
 
 }

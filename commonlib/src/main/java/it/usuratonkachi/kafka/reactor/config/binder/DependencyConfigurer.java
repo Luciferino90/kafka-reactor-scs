@@ -24,8 +24,14 @@ public class DependencyConfigurer implements BeanFactoryPostProcessor {
                     try {
                         Class<?> clazz = findClassByBeanName(beanFactory, slaveBeanName);
                         if (clazz == null) return Tuples.of(slaveBeanName, new ArrayList<String>());
-                        List<String> methodChannels = Arrays.stream(clazz.getMethods()).filter(method -> method.isAnnotationPresent(ReactorStreamListener.class)).map(method -> method.getAnnotation(ReactorStreamListener.class).value()).collect(Collectors.toList());
-                        List<String> fieldChannels = Arrays.stream(clazz.getDeclaredFields()).filter(field -> field.isAnnotationPresent(ReactorMessageChannel.class)).map(field -> field.getAnnotation(ReactorMessageChannel.class).value()).collect(Collectors.toList());
+                        List<String> methodChannels = Arrays.stream(clazz.getMethods())
+                                .filter(method -> method.isAnnotationPresent(ReactorStreamListener.class))
+                                .map(method -> method.getAnnotation(ReactorStreamListener.class).value()).collect(
+								Collectors.toList());
+                        List<String> fieldChannels = Arrays.stream(clazz.getDeclaredFields())
+                                .filter(field -> field.isAnnotationPresent(ReactorMessageChannel.class))
+                                .map(field -> field.getAnnotation(ReactorMessageChannel.class).value()).collect(
+										Collectors.toList());
                         methodChannels.addAll(fieldChannels);
                         return Tuples.of(slaveBeanName, methodChannels);
                     } catch (Exception ex) {
@@ -37,10 +43,12 @@ public class DependencyConfigurer implements BeanFactoryPostProcessor {
                 .forEach(slaveBeanNameKafkaChannels -> innerCheck(beanFactory, slaveBeanNameKafkaChannels.getT1(), slaveBeanNameKafkaChannels.getT2()));
     }
 
-    private void innerCheck(ConfigurableListableBeanFactory beanFactory, String slaveBeanName, List<String> dependentChannels){
+    private void innerCheck(
+			ConfigurableListableBeanFactory beanFactory, String slaveBeanName, List<String> dependentChannels){
         Arrays.stream(beanFactory.getBeanNamesForAnnotation(ReactorChannelBinder.class))
                 .forEach(masterBeanName -> {
-                    List<String> masterBeanChannels = Arrays.stream(findClassByBeanName(beanFactory, masterBeanName).getDeclaredFields()).filter(field -> field.isAnnotationPresent(ReactorChannel.class)).map(field -> field.getAnnotation(ReactorChannel.class).value()).collect(Collectors.toList());
+                    List<String> masterBeanChannels = Arrays.stream(findClassByBeanName(beanFactory, masterBeanName).getDeclaredFields()).filter(field -> field.isAnnotationPresent(ReactorChannel.class)).map(field -> field.getAnnotation(ReactorChannel.class).value()).collect(
+							Collectors.toList());
                     if (dependentChannels.stream().anyMatch(masterBeanChannels::contains))
                         beanFactory.getBeanDefinition(slaveBeanName).setDependsOn(masterBeanName);
                 });
