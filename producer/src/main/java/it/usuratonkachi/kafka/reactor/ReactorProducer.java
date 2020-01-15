@@ -3,7 +3,10 @@ package it.usuratonkachi.kafka.reactor;
 import it.usuratonkachi.kafka.data.service.KafkaService;
 import it.usuratonkachi.kafka.dto.*;
 import it.usuratonkachi.kafka.reactor.config.annotation.output.ReactorMessageChannel;
+import it.usuratonkachi.kafka.spring.streamconfig.Streams;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.kafka.support.KafkaHeaders;
@@ -19,7 +22,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
-import static it.usuratonkachi.kafka.reactor.streamconfig.Streams.*;
+import static it.usuratonkachi.kafka.reactor.streamconfig.Streams.NOTIFICATION_CHANNEL_OUTPUT;
+import static it.usuratonkachi.kafka.spring.streamconfig.Streams.*;
 
 @Component
 @RequiredArgsConstructor
@@ -165,9 +169,9 @@ public class ReactorProducer implements CommandLineRunner {
 		String msg = profile;
 		count = 1;
 		sendMail(count, 0).subscribe();
-		sendMessage(count, 0).subscribe();
-		sendMms(count, 0).subscribe();
-		sendSms(count, 0).collectList().block();
+		//sendMessage(count, 0).subscribe();
+		//sendMms(count, 0).subscribe();
+		//sendSms(count, 0).collectList().block();
 		//sendNotification(count, 0).blockLast();
 	}
 
@@ -177,9 +181,9 @@ public class ReactorProducer implements CommandLineRunner {
 				.doOnNext(i -> {
 					int basecount = base.getAndIncrement();
 					sendMail(count, basecount).subscribe();
-					sendMessage(count, basecount).subscribe();
-					sendMms(count, basecount).subscribe();
-					sendSms(count, basecount).subscribe();
+					//sendMessage(count, basecount).subscribe();
+					//sendMms(count, basecount).subscribe();
+					//sendSms(count, basecount).subscribe();
 				})
 				.collectList()
 				.block();

@@ -116,7 +116,8 @@ public class ReactorConsumer {
                             Collectors.toList());
                 })
                 .addRevokeListener(receiverPartitions -> {
-                    toAck.values().stream().flatMap(Collection::stream).forEach(this::ackRecord);
+                    toAck.values().stream().flatMap(Collection::stream)
+                            .forEach(a -> this.ackRecord(a));
                     List<Integer> revokedPartition = receiverPartitions.stream().map(receiverPartition -> receiverPartition.topicPartition().partition()).collect(
                             Collectors.toList());
                     assignedPartitions = assignedPartitions.stream().filter(assignedPartition -> !revokedPartition.contains(assignedPartition)).collect(
