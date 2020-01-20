@@ -14,6 +14,7 @@ import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
 import reactor.kafka.receiver.ReceiverRecord;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -117,11 +118,13 @@ public class ReactorConsumer {
     private ReceiverOptions<byte[], byte[]> kafkaReceiverOptions() {
         ReceiverOptions<byte[], byte[]> options = ReceiverOptions.create(kafkaConsumerConfiguration());
         return options.subscription(Arrays.asList(this.bindingProperties.getDestination().split(",")))
+                .pollTimeout(Duration.ofMillis(120000))
                 .withKeyDeserializer(new ByteArrayDeserializer())
                 .withValueDeserializer(new ByteArrayDeserializer())
                 .addAssignListener(receiverPartitions -> {
-                    assignedPartitions = receiverPartitions.stream().map(receiverPartition -> receiverPartition.topicPartition().partition()).collect(
-                            Collectors.toList());
+                    assignedPartitions = receiverPartitions.stream()
+                            .map(receiverPartition -> receiverPartition.topicPartition().partition())
+                            .collect(Collectors.toList());
                 })
                 .addRevokeListener(receiverPartitions -> {
                     if (!toAck.isEmpty()) {
@@ -131,10 +134,13 @@ public class ReactorConsumer {
                                 .forEach(this::ackRecord);
                         toAck = new HashMap<>();
                     }
+
                     List<Integer> revokedPartition = receiverPartitions.stream()
                             .map(receiverPartition -> receiverPartition.topicPartition().partition())
                             .collect(Collectors.toList());
-                    assignedPartitions = assignedPartitions.stream().filter(assignedPartition -> !revokedPartition.contains(assignedPartition))
+
+                    assignedPartitions = assignedPartitions.stream()
+                            .filter(assignedPartition -> !revokedPartition.contains(assignedPartition))
                             .collect(Collectors.toList());
                 })
                 .maxCommitAttempts(0);

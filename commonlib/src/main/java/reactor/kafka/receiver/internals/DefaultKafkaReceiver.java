@@ -506,15 +506,23 @@ public class DefaultKafkaReceiver<K, V> implements KafkaReceiver<K, V>, Consumer
 							// Handled separately using transactional KafkaSender
 							break;
 						default:
-							consumer.commitAsync(commitArgs.offsets(), (offsets, exception) -> {
-								inProgress.decrementAndGet();
-								if (exception == null)
-									handleSuccess(commitArgs, offsets);
-								else
-									handleFailure(commitArgs, exception);
-							});
-							pollEvent.scheduleIfRequired();
+							try {
+								consumer.commitSync(commitArgs.offsets());
+								handleSuccess(commitArgs, commitArgs.offsets());
+							} catch (Exception e) {
+								handleFailure(commitArgs, e);
+							}
+							inProgress.decrementAndGet();
 							break;
+							// consumer.commitAsync(commitArgs.offsets(), (offsets, exception) -> {
+							// 	inProgress.decrementAndGet();
+							// 	if (exception == null)
+							// 		handleSuccess(commitArgs, offsets);
+							// 	else
+							// 		handleFailure(commitArgs, exception);
+							// });
+							// pollEvent.scheduleIfRequired();
+							// break;
 						}
 						if (ackMode != AckMode.ATMOST_ONCE) {
 						} else {

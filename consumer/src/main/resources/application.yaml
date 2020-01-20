@@ -146,8 +146,8 @@ defaut:
 
 logging:
   level:
-    root: INFO
-    it.usuratonkachi.kafka.reactor.config: INFO
+    root: WARN
+    it.usuratonkachi.kafka.reactor.config: WARN
 ---
 spring:
   profiles: 1
