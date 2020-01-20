@@ -36,16 +36,21 @@ public class ReactorConsumer {
 
     private Map<Integer, List<ReceiverRecord<byte[], byte[]>>> toAck = new ConcurrentHashMap<>();
 
-    public void toBeAcked(ReceiverRecord<byte[], byte[]> receiverRecord){
+    public synchronized void toBeAcked(ReceiverRecord<byte[], byte[]> receiverRecord){
         List<ReceiverRecord<byte[], byte[]>> pendingAck = toAck.getOrDefault(receiverRecord.partition(), new ArrayList<>());
         pendingAck.add(receiverRecord);
         toAck.put(receiverRecord.partition(), pendingAck);
     }
 
-    public void ackRecord(ReceiverRecord<byte[], byte[]> receiverRecord){
+    public synchronized void ackRecord(ReceiverRecord<byte[], byte[]> receiverRecord){
+        ackRecord(receiverRecord, false);
+    }
+
+    public synchronized void ackRecord(ReceiverRecord<byte[], byte[]> receiverRecord, boolean remove){
         receiverRecord.receiverOffset().acknowledge();
         receiverRecord.receiverOffset().commit().subscribe();
-        Optional.ofNullable(toAck.get(receiverRecord.partition())).ifPresent(pendingAck -> pendingAck.remove(receiverRecord));
+        if (remove)
+            Optional.ofNullable(toAck.get(receiverRecord.partition())).ifPresent(pendingAck -> pendingAck.remove(receiverRecord));
     }
 
     public Boolean hasManualAck(){
@@ -119,13 +124,18 @@ public class ReactorConsumer {
                             Collectors.toList());
                 })
                 .addRevokeListener(receiverPartitions -> {
-                    toAck.values().stream().flatMap(Collection::stream)
-                            .peek(receiverRecord -> log.warn("Rebalancing, acking element with offset " + receiverRecord.receiverOffset().offset()))
-                            .forEach(this::ackRecord);
-                    List<Integer> revokedPartition = receiverPartitions.stream().map(receiverPartition -> receiverPartition.topicPartition().partition()).collect(
-                            Collectors.toList());
-                    assignedPartitions = assignedPartitions.stream().filter(assignedPartition -> !revokedPartition.contains(assignedPartition)).collect(
-                            Collectors.toList());
+                    if (!toAck.isEmpty()) {
+                        toAck.values().stream().flatMap(Collection::stream).filter(Objects::nonNull)
+                                .peek(receiverRecord -> log.warn(String.format("Rebalancing, acking element with partition %s and offset %s",
+                                        receiverRecord.partition(), receiverRecord.offset())))
+                                .forEach(this::ackRecord);
+                        toAck = new HashMap<>();
+                    }
+                    List<Integer> revokedPartition = receiverPartitions.stream()
+                            .map(receiverPartition -> receiverPartition.topicPartition().partition())
+                            .collect(Collectors.toList());
+                    assignedPartitions = assignedPartitions.stream().filter(assignedPartition -> !revokedPartition.contains(assignedPartition))
+                            .collect(Collectors.toList());
                 })
                 .maxCommitAttempts(0);
     }

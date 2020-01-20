@@ -128,14 +128,14 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 								return function.apply(receiverRecordToMessage(receiverRecord))
 										.switchIfEmpty(Mono.defer(() -> {
 											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
-												consumer.ackRecord(receiverRecord);
+												consumer.ackRecord(receiverRecord, true);
 											}
 											return Mono.empty();
 										}))
 										.doOnError(e -> log.error(e.getMessage(), e))
 										.doOnError(RuntimeException.class, businessException -> {
 											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
-												consumer.ackRecord(receiverRecord);
+												consumer.ackRecord(receiverRecord, true);
 											}
 										})
 										.onErrorResume(e -> Mono.empty());
@@ -148,7 +148,6 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 				.doOnError(Throwable::printStackTrace)
 				.onErrorResume(e -> Mono.empty())
 				.subscribe();
-
 	}
 
 	private void listenAtmostOnce(Function<Message<T>, Mono<Void>> function, ReactorConsumer consumer) {
