@@ -169,10 +169,10 @@ public class ReactorProducer implements CommandLineRunner {
 		String msg = profile;
 		count = 1;
 		sendMail(count, 0).subscribe();
-		//sendMessage(count, 0).subscribe();
-		//sendMms(count, 0).subscribe();
-		//sendSms(count, 0).collectList().block();
-		//sendNotification(count, 0).blockLast();
+		sendMessage(count, 0).subscribe();
+		sendMms(count, 0).subscribe();
+		sendSms(count, 0).subscribe();
+		sendNotification(count, 0).blockLast();
 	}
 
 	public void runForever() {
@@ -181,9 +181,10 @@ public class ReactorProducer implements CommandLineRunner {
 				.doOnNext(i -> {
 					int basecount = base.getAndIncrement();
 					sendMail(count, basecount).subscribe();
-					//sendMessage(count, basecount).subscribe();
-					//sendMms(count, basecount).subscribe();
-					//sendSms(count, basecount).subscribe();
+					sendMessage(count, basecount).subscribe();
+					sendMms(count, basecount).subscribe();
+					sendSms(count, basecount).subscribe();
+					sendNotification(count, 0).subscribe();
 				})
 				.collectList()
 				.block();

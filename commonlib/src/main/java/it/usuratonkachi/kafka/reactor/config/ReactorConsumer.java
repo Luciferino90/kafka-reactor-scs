@@ -1,6 +1,7 @@
 package it.usuratonkachi.kafka.reactor.config;
 
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
@@ -18,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+@Slf4j
 public class ReactorConsumer {
 
     private final KafkaConsumerProperties kafkaConsumerProperties;
@@ -37,6 +39,7 @@ public class ReactorConsumer {
     public void toBeAcked(ReceiverRecord<byte[], byte[]> receiverRecord){
         List<ReceiverRecord<byte[], byte[]>> pendingAck = toAck.getOrDefault(receiverRecord.partition(), new ArrayList<>());
         pendingAck.add(receiverRecord);
+        toAck.put(receiverRecord.partition(), pendingAck);
     }
 
     public void ackRecord(ReceiverRecord<byte[], byte[]> receiverRecord){
@@ -117,7 +120,8 @@ public class ReactorConsumer {
                 })
                 .addRevokeListener(receiverPartitions -> {
                     toAck.values().stream().flatMap(Collection::stream)
-                            .forEach(a -> this.ackRecord(a));
+                            .peek(receiverRecord -> log.warn("Rebalancing, acking element with offset " + receiverRecord.receiverOffset().offset()))
+                            .forEach(this::ackRecord);
                     List<Integer> revokedPartition = receiverPartitions.stream().map(receiverPartition -> receiverPartition.topicPartition().partition()).collect(
                             Collectors.toList());
                     assignedPartitions = assignedPartitions.stream().filter(assignedPartition -> !revokedPartition.contains(assignedPartition)).collect(

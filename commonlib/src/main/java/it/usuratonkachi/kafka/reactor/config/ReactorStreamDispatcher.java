@@ -123,7 +123,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 						}))
 						.doOnNext(receiverRecord -> partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset()))
 						.doOnNext(consumer::toBeAcked)
-						.flatMap(receiverRecord -> {
+						.flatMapSequential(receiverRecord -> {
 							try {
 								return function.apply(receiverRecordToMessage(receiverRecord))
 										.switchIfEmpty(Mono.defer(() -> {
