@@ -42,7 +42,7 @@ public class ReactorConsumer {
         toAck.put(receiverRecord.partition(), pendingAck);
     }
 
-    public synchronized void ackRecord(ReceiverRecord<byte[], byte[]> receiverRecord){
+    public void ackRecord(ReceiverRecord<byte[], byte[]> receiverRecord){
         ackRecord(receiverRecord, false);
     }
 

@@ -30,8 +30,7 @@ public class DependencyConfigurer implements BeanFactoryPostProcessor {
 								Collectors.toList());
                         List<String> fieldChannels = Arrays.stream(clazz.getDeclaredFields())
                                 .filter(field -> field.isAnnotationPresent(ReactorMessageChannel.class))
-                                .map(field -> field.getAnnotation(ReactorMessageChannel.class).value()).collect(
-										Collectors.toList());
+                                .map(field -> field.getAnnotation(ReactorMessageChannel.class).value()).collect(Collectors.toList());
                         methodChannels.addAll(fieldChannels);
                         return Tuples.of(slaveBeanName, methodChannels);
                     } catch (Exception ex) {

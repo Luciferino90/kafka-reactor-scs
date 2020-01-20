@@ -135,8 +135,7 @@ public class ReactorStreamListenerAnnotationBeanPostProcessor implements BeanPos
 		params[parameterPosition.getHeaderPosition()] = message.getHeaders().entrySet()
 				.stream()
 				.filter(entry -> !extractedHeaders.contains(entry.getKey()))
-				.collect(Collectors
-						.groupingBy(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, mapToSingleElement())));
+				.collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, mapToSingleElement())));
 
 		return params;
 	}
