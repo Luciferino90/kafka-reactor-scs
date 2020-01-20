@@ -38,15 +38,15 @@ public class ReactorConsumer {
 		return Mono.just(notification).flatMap(not -> Mono.empty());
 	}
 
-	@ReactorStreamListener(Streams.MAIL_CHANNEL_INPUT) public Mono<Void> mailListener(@Payload Mail mail,
-			@Headers Map<String, Object> headers) {
+	@ReactorStreamListener(Streams.MAIL_CHANNEL_INPUT)
+	public Mono<Void> mailListener(@Payload Mail mail, @Headers Map<String, Object> headers) {
 		return Mono.just(mail).delayElement(Duration.ofMillis(waittime)).doOnNext(
 				m -> kafkaService.ackIfNotYetLogOtherwise(m.getMsgNum(), m.getProducer(), m.getClass().getSimpleName()))
 				.flatMap(e -> Mono.empty());
 	}
 
-	@ReactorStreamListener(Streams.MESSAGE_CHANNEL_INPUT) public Mono<Void> messageListener(@Payload Message message,
-			@Headers Map<String, Object> headers) {
+	@ReactorStreamListener(Streams.MESSAGE_CHANNEL_INPUT)
+	public Mono<Void> messageListener(@Payload Message message, @Headers Map<String, Object> headers) {
 		return Mono.just(message).delayElement(Duration.ofMillis(waittime)).doOnNext(
 				m -> kafkaService.ackIfNotYetLogOtherwise(m.getMsgNum(), m.getProducer(), m.getClass().getSimpleName()))
 				.flatMap(e -> Mono.empty());
