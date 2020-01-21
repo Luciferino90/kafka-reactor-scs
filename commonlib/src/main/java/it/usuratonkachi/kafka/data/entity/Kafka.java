@@ -19,9 +19,14 @@ import java.io.Serializable;
 @Table(indexes = {
 		@Index(name = "msgid_idx",  columnList="msgid", unique = false),
 		@Index(name = "msgtype_idx", columnList="msgtype",     unique = false),
-		@Index(name = "producerid_idx", columnList="producerid",     unique = false)
+		@Index(name = "producerid_idx", columnList="producerid",     unique = false),
+		@Index(name = "partition_idx", columnList="partitionnumber",     unique = false),
+		@Index(name = "offset_idx", columnList="offsetnumber",     unique = false)
 })
 public class Kafka implements Serializable {
+
+	private Integer partitionnumber;
+	private Integer offsetnumber;
 
 	@Id
 	private String id;

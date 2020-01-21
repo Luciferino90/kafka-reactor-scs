@@ -26,10 +26,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+
+import static it.usuratonkachi.kafka.reactor.config.ReactorHeaderConstant.OFFSET_HEADER;
+import static it.usuratonkachi.kafka.reactor.config.ReactorHeaderConstant.PARTITION_HEADER;
 
 /**
  * Classe che di occupa di leggere e inviare messaggi verso kafka.
@@ -106,6 +110,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 		Map<Integer, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
 		Integer concurrency = reactorKafkaConfiguration.getConcurrency();
 		consumer.receive()
+				.doOnNext(e -> System.out.println(""))
 				.buffer(concurrency)
 				.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
 						.filter(r -> {
@@ -128,14 +133,14 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 								return function.apply(receiverRecordToMessage(receiverRecord))
 										.switchIfEmpty(Mono.defer(() -> {
 											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
-												consumer.ackRecord(receiverRecord, true);
+												consumer.ackRecord(receiverRecord);
 											}
 											return Mono.empty();
 										}))
 										.doOnError(e -> log.error(e.getMessage(), e))
 										.doOnError(RuntimeException.class, businessException -> {
 											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
-												consumer.ackRecord(receiverRecord, true);
+												consumer.ackRecord(receiverRecord);
 											}
 										})
 										.onErrorResume(e -> Mono.empty());
@@ -144,7 +149,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 							}
 							return Mono.empty();
 						})
-				)
+				, 1)
 				.doOnError(Throwable::printStackTrace)
 				.onErrorResume(e -> Mono.empty())
 				.subscribe();
@@ -260,7 +265,9 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 		headersMap.putAll(Map.of(
 				KafkaHeaders.RECEIVED_PARTITION_ID, serializeHeader(receiverRecord.receiverOffset().topicPartition().partition()),
 				KafkaHeaders.RECEIVED_TOPIC, serializeHeader(receiverRecord.receiverOffset().topicPartition().topic()),
-				KafkaHeaders.RECEIVED_TIMESTAMP, serializeHeader(receiverRecord.timestamp())
+				KafkaHeaders.RECEIVED_TIMESTAMP, serializeHeader(receiverRecord.timestamp()),
+				PARTITION_HEADER, receiverRecord.partition(),
+				OFFSET_HEADER, receiverRecord.offset()
 		));
 		MessageHeaders headers = new MessageHeaders(headersMap);
 		return receiverRecordToMessage(receiverRecord, headers);
@@ -306,7 +313,9 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 		headersMap.putAll(Map.of(
 				KafkaHeaders.RECEIVED_PARTITION_ID, serializeHeader(consumerRecord.partition()),
 				KafkaHeaders.RECEIVED_TOPIC, serializeHeader(consumerRecord.topic()),
-				KafkaHeaders.RECEIVED_TIMESTAMP, serializeHeader(consumerRecord.timestamp())
+				KafkaHeaders.RECEIVED_TIMESTAMP, serializeHeader(consumerRecord.timestamp()),
+				PARTITION_HEADER, consumerRecord.partition(),
+				OFFSET_HEADER, consumerRecord.offset()
 		));
 		MessageHeaders headers = new MessageHeaders(headersMap);
 		return consumerRecordToMessage(consumerRecord, headers);

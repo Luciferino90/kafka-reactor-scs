@@ -15,6 +15,7 @@
  */
 package reactor.kafka.receiver.internals;
 
+import lombok.Getter;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
@@ -73,8 +74,7 @@ public class DefaultKafkaReceiver<K, V> implements KafkaReceiver<K, V>, Consumer
 	private final List<Disposable>                                 subscribeDisposables;
 	private final AtomicLong                                       requestsPending;
 	private final AtomicBoolean                                    needsHeartbeat;
-	private final AtomicInteger
-			consecutiveCommitFailures;
+	private final AtomicInteger									   consecutiveCommitFailures;
 	private final KafkaSchedulers.EventScheduler                   eventScheduler;
 	private final AtomicBoolean                                    isActive;
 	private final AtomicBoolean                                    isClosed;
@@ -101,6 +101,10 @@ public class DefaultKafkaReceiver<K, V> implements KafkaReceiver<K, V>, Consumer
 
 	enum AckMode {
 		AUTO_ACK, MANUAL_ACK, ATMOST_ONCE, EXACTLY_ONCE
+	}
+
+	public void commitSync(Map<TopicPartition, OffsetAndMetadata> offsets){
+		consumer.commitSync(offsets);
 	}
 
 	public DefaultKafkaReceiver(ConsumerFactory consumerFactory, ReceiverOptions<K, V> receiverOptions) {

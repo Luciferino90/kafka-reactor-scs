@@ -37,9 +37,11 @@ public class KafkaService {
 
 	@Transactional
 	@Modifying
-	public void ackIfNotYetLogOtherwise(String msgid, String producerid, String msgtype){
+	public void ackIfNotYetLogOtherwise(String msgid, String producerid, String msgtype, Integer partition, Integer offset){
 		Kafka k = kafkaRepository.findByMsgidAndMsgtypeAndProducerid(msgid, msgtype, producerid).get();
 		if (StringUtils.isEmpty(k.getAckedby())){
+			k.setOffsetnumber(offset);
+			k.setPartitionnumber(partition);
 			k.setAckedby(profile);
 			k.setAckreceived(k.getAckreceived()+1);
 			k = kafkaRepository.saveAndFlush(k);

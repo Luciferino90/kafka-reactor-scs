@@ -11,10 +11,12 @@ spring:
     username: kafkacheck
     password: kafkacheck
   jpa:
+    # show-sql: true
     hibernate:
       ddl-auto: validate
     properties:
       hibernate:
+        # format_sql: true
         dialect: org.hibernate.dialect.MySQL57Dialect
 
   http:
