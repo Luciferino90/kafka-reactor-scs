@@ -15,7 +15,6 @@
  */
 package reactor.kafka.receiver.internals;
 
-import lombok.Getter;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
@@ -44,9 +43,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-public class DefaultKafkaReceiver<K, V> implements KafkaReceiver<K, V>, ConsumerRebalanceListener {
+public class ReactorKafkaReceiver<K, V> implements KafkaReceiver<K, V>, ConsumerRebalanceListener {
 
-	private static final Logger log = LoggerFactory.getLogger(DefaultKafkaReceiver.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(ReactorKafkaReceiver.class.getName());
 
 	/** Note: Methods added to this set should also be included in javadoc for {@link KafkaReceiver#doOnConsumer(Function)} */
 	private static final Set<String> DELEGATE_METHODS = new HashSet<>(Arrays.asList(
@@ -103,11 +102,11 @@ public class DefaultKafkaReceiver<K, V> implements KafkaReceiver<K, V>, Consumer
 		AUTO_ACK, MANUAL_ACK, ATMOST_ONCE, EXACTLY_ONCE
 	}
 
-	public void commitSync(Map<TopicPartition, OffsetAndMetadata> offsets){
-		consumer.commitSync(offsets);
+	public static <K, V> KafkaReceiver<K, V> create(ReceiverOptions<K, V> options) {
+		return new ReactorKafkaReceiver<>(ConsumerFactory.INSTANCE, options);
 	}
 
-	public DefaultKafkaReceiver(ConsumerFactory consumerFactory, ReceiverOptions<K, V> receiverOptions) {
+	public ReactorKafkaReceiver(ConsumerFactory consumerFactory, ReceiverOptions<K, V> receiverOptions) {
 		fluxList = new ArrayList<>();
 		subscribeDisposables = new ArrayList<>();
 		requestsPending = new AtomicLong();
@@ -518,15 +517,6 @@ public class DefaultKafkaReceiver<K, V> implements KafkaReceiver<K, V>, Consumer
 							}
 							inProgress.decrementAndGet();
 							break;
-							// consumer.commitAsync(commitArgs.offsets(), (offsets, exception) -> {
-							// 	inProgress.decrementAndGet();
-							// 	if (exception == null)
-							// 		handleSuccess(commitArgs, offsets);
-							// 	else
-							// 		handleFailure(commitArgs, exception);
-							// });
-							// pollEvent.scheduleIfRequired();
-							// break;
 						}
 						if (ackMode != AckMode.ATMOST_ONCE) {
 						} else {

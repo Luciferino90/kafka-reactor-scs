@@ -2,6 +2,7 @@ package it.usuratonkachi.kafka.reactor.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.netty.handler.logging.LogLevel;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -32,6 +33,7 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import static it.usuratonkachi.kafka.reactor.config.LoggingUtils.log;
 import static it.usuratonkachi.kafka.reactor.config.ReactorHeaderConstant.OFFSET_HEADER;
 import static it.usuratonkachi.kafka.reactor.config.ReactorHeaderConstant.PARTITION_HEADER;
 
@@ -106,50 +108,88 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 	 * @param function
 	 * 		function da eseguire su ciascun messaggio
 	 */
+	private void listenAtleastOnce_(Function<Message<T>, Mono<Void>> function, ReactorConsumer consumer) {
+		Map<Integer, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
+		Integer concurrency = reactorKafkaConfiguration.getConcurrency();
+		consumer.receive()
+				.buffer(concurrency)
+				.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
+								.flatMapSequential(receiverRecord -> {
+									log(LogLevel.TRACE, "Read message with topic %s partition %s and offset %s", receiverRecord);
+									consumer.toBeAcked(receiverRecord);
+									Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(receiverRecord.partition()));
+									if (oldOffset.isPresent() && oldOffset.get() >= receiverRecord.offset()) {
+										log(LogLevel.TRACE, "Message with topic %s partition %s and offset %s already managed by this consumer. Skip.", receiverRecord);
+										return Mono.empty();
+									}
+									if (!consumer.hasPartitionAssigned(receiverRecord.partition())) {
+										log(LogLevel.TRACE, "Message with topic %s partition %s and offset %s with partition revoked for this consumer. Skip.", receiverRecord);
+										return Mono.empty();
+									}
+									partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset());
+									try {
+										return function.apply(receiverRecordToMessage(receiverRecord))
+												.switchIfEmpty(Mono.defer(() -> {
+													if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
+														consumer.ackRecord(receiverRecord);
+													}
+													return Mono.empty();
+												}))
+												.doOnError(e -> log.error(e.getMessage(), e))
+												.doOnError(RuntimeException.class, businessException -> {
+													if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
+														consumer.ackRecord(receiverRecord);
+													}
+												})
+												.onErrorResume(e -> Mono.empty());
+									} catch (Exception ex) {
+										log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+									}
+									return Mono.empty();
+								})
+						, 1)
+				.doOnError(Throwable::printStackTrace)
+				.onErrorResume(e -> Mono.empty())
+				.subscribe();
+	}
+
 	private void listenAtleastOnce(Function<Message<T>, Mono<Void>> function, ReactorConsumer consumer) {
 		Map<Integer, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
 		Integer concurrency = reactorKafkaConfiguration.getConcurrency();
 		consumer.receive()
-				.doOnNext(e -> System.out.println(""))
-				.buffer(concurrency)
-				.concatMap(receiverRecords -> Flux.fromIterable(receiverRecords)
-						.filter(r -> {
-							Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(r.partition()));
-							return oldOffset.isEmpty() || oldOffset.get() < r.offset();
-						})
-						.switchIfEmpty(Mono.defer(() -> {
-							log.debug("Message already managed by this consumer. Skipped.");
-							return Mono.empty();
-						}))
-						.filter(r -> consumer.hasPartitionAssigned(r.partition()))
-						.switchIfEmpty(Mono.defer(() -> {
-							log.debug("Partition revoked, cannot commit message. Skipped.");
-							return Mono.empty();
-						}))
-						.doOnNext(receiverRecord -> partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset()))
-						.doOnNext(consumer::toBeAcked)
-						.flatMapSequential(receiverRecord -> {
-							try {
-								return function.apply(receiverRecordToMessage(receiverRecord))
-										.switchIfEmpty(Mono.defer(() -> {
-											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
-												consumer.ackRecord(receiverRecord);
-											}
-											return Mono.empty();
-										}))
-										.doOnError(e -> log.error(e.getMessage(), e))
-										.doOnError(RuntimeException.class, businessException -> {
-											if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
-												consumer.ackRecord(receiverRecord);
-											}
-										})
-										.onErrorResume(e -> Mono.empty());
-							} catch (Exception ex) {
-								log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
-							}
-							return Mono.empty();
-						})
-				, 1)
+				.flatMapSequential(receiverRecord -> {
+					log(LogLevel.TRACE, "Read message with topic %s partition %s and offset %s", receiverRecord);
+					consumer.toBeAcked(receiverRecord);
+					Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(receiverRecord.partition()));
+					if (oldOffset.isPresent() && oldOffset.get() >= receiverRecord.offset()) {
+						log(LogLevel.TRACE, "Message with topic %s partition %s and offset %s already managed by this consumer. Skip.", receiverRecord);
+						return Mono.empty();
+					}
+					if (!consumer.hasPartitionAssigned(receiverRecord.partition())) {
+						log(LogLevel.TRACE, "Message with topic %s partition %s and offset %s with partition revoked for this consumer. Skip.", receiverRecord);
+						return Mono.empty();
+					}
+					partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset());
+					try {
+						return function.apply(receiverRecordToMessage(receiverRecord))
+								.switchIfEmpty(Mono.defer(() -> {
+									if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
+										consumer.ackRecord(receiverRecord);
+									}
+									return Mono.empty();
+								}))
+								.doOnError(e -> log.error(e.getMessage(), e))
+								.doOnError(RuntimeException.class, businessException -> {
+									if (consumer.hasPartitionAssigned(receiverRecord.partition())) {
+										consumer.ackRecord(receiverRecord);
+									}
+								})
+								.onErrorResume(e -> Mono.empty());
+					} catch (Exception ex) {
+						log.debug("Exception found, message not committed nor acknowledged, will be retried in minutes: " + ex.getMessage(), ex);
+					}
+					return Mono.empty();
+				}, 3, 1)
 				.doOnError(Throwable::printStackTrace)
 				.onErrorResume(e -> Mono.empty())
 				.subscribe();

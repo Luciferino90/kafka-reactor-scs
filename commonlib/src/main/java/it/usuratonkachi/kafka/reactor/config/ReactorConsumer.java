@@ -1,11 +1,10 @@
 package it.usuratonkachi.kafka.reactor.config;
 
+import io.netty.handler.logging.LogLevel;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.springframework.cloud.stream.binder.ConsumerProperties;
 import org.springframework.cloud.stream.binder.kafka.properties.KafkaConsumerProperties;
@@ -15,13 +14,14 @@ import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
 import reactor.kafka.receiver.ReceiverRecord;
-import reactor.kafka.receiver.internals.DefaultKafkaReceiver;
+import reactor.kafka.receiver.internals.ReactorKafkaReceiver;
 
-import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
+
+import static it.usuratonkachi.kafka.reactor.config.LoggingUtils.log;
 
 @Slf4j
 public class ReactorConsumer {
@@ -38,25 +38,18 @@ public class ReactorConsumer {
     private KafkaReceiver<byte[], byte[]> receiver;
     private ContainerProperties.AckMode ackMode = ContainerProperties.AckMode.MANUAL;
 
-    private Map<TopicPartition, ReceiverRecord<byte[], byte[]>> offsetsToCommit = new ConcurrentHashMap<>();
+    private final BlockingQueue<ReceiverRecord<byte[], byte[]>> acks = new LinkedBlockingQueue<>();
 
-    public synchronized void toBeAcked(ReceiverRecord<byte[], byte[]> receiverRecord){
-        Optional.ofNullable(offsetsToCommit.get(receiverRecord.receiverOffset().topicPartition())).ifPresentOrElse(oldReceiverRecord-> {
-            if (oldReceiverRecord.receiverOffset().offset() < receiverRecord.receiverOffset().offset()) offsetsToCommit.put(receiverRecord.receiverOffset().topicPartition(), receiverRecord);
-        }, () -> offsetsToCommit.put(receiverRecord.receiverOffset().topicPartition(), receiverRecord));
+    public synchronized void toBeAcked(ReceiverRecord<byte[], byte[]> record){
+        log(LogLevel.TRACE, "Adding element with topic %s partition %s and offset %s", record);
+        acks.add(record);
     }
 
     public synchronized void ackRecord(ReceiverRecord<byte[], byte[]> receiverRecord){
-        Optional.ofNullable(offsetsToCommit.get(receiverRecord.receiverOffset().topicPartition()))
-                .ifPresent(offsetAndMetadata -> {
-                    receiverRecord.receiverOffset().acknowledge();
-                    receiverRecord.receiverOffset().commit().subscribe();
-                    Optional.ofNullable(offsetsToCommit.get(receiverRecord.receiverOffset().topicPartition()))
-                            .ifPresent(oof -> {
-                                if (oof.receiverOffset().offset() == receiverRecord.receiverOffset().offset())
-                                    offsetsToCommit.remove(receiverRecord.receiverOffset().topicPartition());
-                            });
-                });
+        log(LogLevel.TRACE, "Acking element with topic %s partition %s and offset %s", receiverRecord);
+        receiverRecord.receiverOffset().acknowledge();
+        receiverRecord.receiverOffset().commit().subscribe();
+        acks.remove(receiverRecord);
     }
 
     public Boolean hasManualAck(){
@@ -122,35 +115,15 @@ public class ReactorConsumer {
     private ReceiverOptions<byte[], byte[]> kafkaReceiverOptions() {
         ReceiverOptions<byte[], byte[]> options = ReceiverOptions.create(kafkaConsumerConfiguration());
         return options.subscription(Arrays.asList(this.bindingProperties.getDestination().split(",")))
-                .pollTimeout(Duration.ofMillis(120000))
+                //.pollTimeout(Duration.ofMillis(120000))
                 .withKeyDeserializer(new ByteArrayDeserializer())
                 .withValueDeserializer(new ByteArrayDeserializer())
                 .addAssignListener(receiverPartitions -> {
-                    // org.springframework.kafka.listener.KafkaMessageListenerContainer:1721:onPartitionsAssigned
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    Map<TopicPartition, OffsetAndMetadata> offsetsToCommit = new HashMap<>();
                     assignedPartitions = receiverPartitions.stream()
-                            .peek(receiverPartition -> offsetsToCommit.put(receiverPartition.topicPartition(), new OffsetAndMetadata(receiverPartition.position())))
                             .map(receiverPartition -> receiverPartition.topicPartition().partition())
                             .collect(Collectors.toList());
-                    ((DefaultKafkaReceiver<byte[], byte[]>)receiver).commitSync(offsetsToCommit);
                 })
                 .addRevokeListener(receiverPartitions -> {
-                    if (!offsetsToCommit.isEmpty()){
-                        offsetsToCommit.entrySet().stream().filter(Objects::nonNull)
-                                .peek(topicPartitionReceiverRecordEntry ->
-                                                log.warn(String.format("Rebalancing, acking element with topic %s partition %s and offset %s",
-                                                        topicPartitionReceiverRecordEntry.getKey().topic(),
-                                                        topicPartitionReceiverRecordEntry.getKey().partition(),
-                                                        topicPartitionReceiverRecordEntry.getValue().offset()
-                                                        ))
-                                        )
-                                .forEach(topicPartitionReceiverRecordEntry -> this.ackRecord(topicPartitionReceiverRecordEntry.getValue()));
-                    }
 
                     List<Integer> revokedPartition = receiverPartitions.stream()
                             .map(receiverPartition -> receiverPartition.topicPartition().partition())
@@ -159,17 +132,19 @@ public class ReactorConsumer {
                     assignedPartitions = assignedPartitions.stream()
                             .filter(assignedPartition -> !revokedPartition.contains(assignedPartition))
                             .collect(Collectors.toList());
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+
+                    ReceiverRecord<byte[], byte[]> record = this.acks.poll();
+                    while (record != null) {
+                        log(LogLevel.TRACE, "Rebalancing, acking element with topic %s partition %s and offset %s", record);
+                        ackRecord(record);
+                        record = this.acks.poll();
                     }
                 })
                 .maxCommitAttempts(0);
     }
 
     private KafkaReceiver<byte[], byte[]> reactiveKafkaReceiver() {
-        return KafkaReceiver.create(kafkaReceiverOptions());
+        return ReactorKafkaReceiver.create(kafkaReceiverOptions());
     }
 
 }
