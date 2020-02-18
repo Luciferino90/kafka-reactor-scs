@@ -22,6 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
+import static it.usuratonkachi.kafka.reactor.streamconfig.Streams.MAIL_CHANNEL_OUTPUT_NEW;
 import static it.usuratonkachi.kafka.reactor.streamconfig.Streams.NOTIFICATION_CHANNEL_OUTPUT;
 import static it.usuratonkachi.kafka.spring.streamconfig.Streams.*;
 
@@ -39,6 +40,8 @@ public class ReactorProducer implements CommandLineRunner {
 
 	@ReactorMessageChannel(MAIL_CHANNEL_OUTPUT)
 	private MessageChannel mailDispatcher;
+	@ReactorMessageChannel(MAIL_CHANNEL_OUTPUT_NEW)
+	private MessageChannel mailDispatcherNew;
 	@ReactorMessageChannel(MESSAGE_CHANNEL_OUTPUT)
 	private MessageChannel messageDispatcher;
 	@ReactorMessageChannel(MMS_CHANNEL_OUTPUT)
@@ -76,6 +79,25 @@ public class ReactorProducer implements CommandLineRunner {
 				)
 				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
 				.map(mailDispatcher::send);
+	}
+
+	private Flux<Boolean> sendMailNew(Integer count, Integer baseCount){
+		int start = baseCount;
+		int end = count + baseCount;
+		return Flux.fromStream(IntStream.range(start, end).boxed())
+				.map(j -> {
+					Mail mail = new Mail();
+					mail.setMsgNum(UUID.randomUUID().toString());
+					mail.setProducer(profile);
+					return mail;
+				})
+				.doOnNext(_msg -> kafkaService.createRecordJpa(_msg.getMsgNum(), _msg.getClass().getSimpleName(), _msg.getProducer()))
+				.map(o -> MessageBuilder.withPayload(o)
+						.copyHeaders(Map.of("X-Test", "Prova MAIL"))
+						.build()
+				)
+				//.doOnNext(r ->  System.out.println("Payload: " + r.getPayload() + " Headers: " + r.getHeaders()))
+				.map(mailDispatcherNew::send);
 	}
 
 	private Flux<Boolean> sendMessage(Integer count, Integer baseCount){
@@ -169,6 +191,7 @@ public class ReactorProducer implements CommandLineRunner {
 		String msg = profile;
 		count = 1;
 		sendMail(count, 0).subscribe();
+		sendMailNew(count, 0).subscribe();
 		sendMessage(count, 0).subscribe();
 		sendMms(count, 0).subscribe();
 		sendSms(count, 0).subscribe();
@@ -181,6 +204,7 @@ public class ReactorProducer implements CommandLineRunner {
 				.doOnNext(i -> {
 					int basecount = base.getAndIncrement();
 					sendMail(count, basecount).subscribe();
+					sendMailNew(count, 0).subscribe();
 					sendMessage(count, basecount).subscribe();
 					sendMms(count, basecount).subscribe();
 					sendSms(count, basecount).subscribe();

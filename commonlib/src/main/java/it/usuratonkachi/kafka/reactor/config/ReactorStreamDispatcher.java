@@ -6,6 +6,7 @@ import io.netty.handler.logging.LogLevel;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.kafka.support.KafkaHeaders;
@@ -154,13 +155,13 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 	}
 
 	private void listenAtleastOnce(Function<Message<T>, Mono<Void>> function, ReactorConsumer consumer) {
-		Map<Integer, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
+		Map<TopicPartition, Long> partitionOffsetDuplicates = new ConcurrentHashMap<>();
 		Integer concurrency = reactorKafkaConfiguration.getConcurrency();
 		consumer.receive()
 				.flatMapSequential(receiverRecord -> {
 					log(LogLevel.TRACE, "Read message with topic %s partition %s and offset %s", receiverRecord);
 					consumer.toBeAcked(receiverRecord);
-					Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(receiverRecord.partition()));
+					Optional<Long> oldOffset = Optional.ofNullable(partitionOffsetDuplicates.get(receiverRecord.receiverOffset().topicPartition()));
 					if (oldOffset.isPresent() && oldOffset.get() >= receiverRecord.offset()) {
 						log(LogLevel.TRACE, "Message with topic %s partition %s and offset %s already managed by this consumer. Skip.", receiverRecord);
 						return Mono.empty();
@@ -169,7 +170,7 @@ public class ReactorStreamDispatcher<T> implements MessageChannel {
 						log(LogLevel.TRACE, "Message with topic %s partition %s and offset %s with partition revoked for this consumer. Skip.", receiverRecord);
 						return Mono.empty();
 					}
-					partitionOffsetDuplicates.put(receiverRecord.partition(), receiverRecord.offset());
+					partitionOffsetDuplicates.put(receiverRecord.receiverOffset().topicPartition(), receiverRecord.offset());
 					try {
 						return function.apply(receiverRecordToMessage(receiverRecord))
 								.switchIfEmpty(Mono.defer(() -> {

@@ -63,6 +63,12 @@ spring:
           contentType: application/json
           producer:
             partition-count: 10
+        mail-kafka-out-new: # producer
+          group: ${spring.application.name}
+          destination: mail-kafka-topic-new # nome della coda di kafka. If not set, the channel name is used instead.
+          contentType: application/json
+          producer:
+            partition-count: 10
         message-kafka-out: # producer
           group: ${spring.application.name}
           destination: message-kafka-topic # nome della coda di kafka. If not set, the channel name is used instead.

@@ -79,5 +79,4 @@ public class ReactorConsumer {
 				.doOnNext(m -> kafkaService.ackIfNotYetLogOtherwise(m.getMsgNum(), m.getProducer(), m.getClass().getSimpleName(), partition, offset))
 				.flatMap(e -> Mono.empty());
 	}
-
 }

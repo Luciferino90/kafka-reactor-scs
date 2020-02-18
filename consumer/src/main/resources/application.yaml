@@ -100,7 +100,7 @@ spring:
             partitioned: true
         mail-kafka-in: # consumer
           group: ${spring.application.name}
-          destination: mail-kafka-topic
+          destination: mail-kafka-topic,mail-kafka-topic-new
           contentType: application/json
           consumer:
             #enable.auto.commit: true
@@ -148,6 +148,7 @@ logging:
   level:
     root: INFO
     it.usuratonkachi.kafka.reactor.config: WARN
+    it.usuratonkachi.kafka.reactor.config.LoggingUtils: WARN
     org.apache.kafka.clients.consumer.internals: WARN
 ---
 spring:
