@@ -18,7 +18,7 @@
 	<properties>
 		<java.version>11</java.version>
 		<commons-lang3.version>3.5</commons-lang3.version>
-		<mysql-connector-java.version>5.1.48</mysql-connector-java.version>
+		<mysql-connector-java.version>8.0.16</mysql-connector-java.version>
 		<spring-cloud-stream-binder-kafka.version>2.2.1.RELEASE</spring-cloud-stream-binder-kafka.version>
 		<reactor-kafka.version>1.2.2.RELEASE</reactor-kafka.version>
 	</properties>
